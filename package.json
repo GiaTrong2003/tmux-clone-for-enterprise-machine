@@ -1,0 +1,22 @@
+{
+  "name": "ldmux",
+  "version": "1.0.0",
+  "description": "Local dmux - Multi-agent orchestrator for Windows Terminal",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "dev": "ts-node src/index.ts gui",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "chokidar": "^3.6.0",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ldmux - Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #58a6ff;
+    }
+
+    header h1 span { color: #8b949e; font-weight: 400; }
+
+    .header-actions { display: flex; gap: 8px; }
+
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #30363d; }
+    button.primary { background: #238636; border-color: #2ea043; color: #fff; }
+    button.primary:hover { background: #2ea043; }
+    button.danger { background: #da3633; border-color: #f85149; color: #fff; }
+    button.danger:hover { background: #f85149; }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* New Worker Form */
+    .new-worker {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .new-worker h2 {
+      font-size: 14px;
+      color: #8b949e;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    input, textarea {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+
+    input.name-input { width: 200px; }
+    textarea.prompt-input { flex: 1; resize: vertical; min-height: 38px; }
+
+    /* Workers Grid */
+    .workers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 16px;
+    }
+
+    .worker-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+
+    .worker-card:hover { border-color: #58a6ff; }
+    .worker-card.running { border-left: 3px solid #f0883e; }
+    .worker-card.done { border-left: 3px solid #3fb950; }
+    .worker-card.error { border-left: 3px solid #f85149; }
+    .worker-card.pending { border-left: 3px solid #8b949e; }
+
+    .worker-header {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .worker-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .worker-status {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .worker-status.running { background: #f0883e20; color: #f0883e; }
+    .worker-status.done { background: #3fb95020; color: #3fb950; }
+    .worker-status.error { background: #f8514920; color: #f85149; }
+    .worker-status.pending { background: #8b949e20; color: #8b949e; }
+
+    .worker-body { padding: 12px 16px; }
+
+    .worker-time {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 8px;
+    }
+
+    .worker-output {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #8b949e;
+    }
+
+    .worker-actions {
+      padding: 8px 16px 12px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .worker-actions button { font-size: 12px; padding: 4px 10px; }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #8b949e;
+    }
+
+    .empty-state h2 { font-size: 18px; margin-bottom: 8px; color: #c9d1d9; }
+
+    /* Merged output modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 { font-size: 16px; }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 24px;
+      padding: 12px 16px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+    }
+
+    .stat { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+    .stat-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .stat-dot.running { background: #f0883e; }
+    .stat-dot.done { background: #3fb950; }
+    .stat-dot.error { background: #f85149; }
+    .stat-dot.total { background: #58a6ff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ldmux <span>Dashboard</span></h1>
+    <div class="header-actions">
+      <button onclick="refreshWorkers()">Refresh</button>
+      <button class="primary" onclick="mergeAll()">Merge All</button>
+      <button class="danger" onclick="cleanAll()">Clean All</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- New Worker Form -->
+    <div class="new-worker">
+      <h2>New Worker</h2>
+      <div class="form-row">
+        <input type="text" id="workerName" class="name-input" placeholder="worker-name">
+        <textarea id="workerPrompt" class="prompt-input" placeholder="Enter prompt for agent..." rows="1"></textarea>
+        <button class="primary" onclick="createWorker()">Start</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat"><span class="stat-dot total"></span> Total: <strong id="statTotal">0</strong></div>
+      <div class="stat"><span class="stat-dot running"></span> Running: <strong id="statRunning">0</strong></div>
+      <div class="stat"><span class="stat-dot done"></span> Done: <strong id="statDone">0</strong></div>
+      <div class="stat"><span class="stat-dot error"></span> Error: <strong id="statError">0</strong></div>
+    </div>
+
+    <!-- Workers -->
+    <div id="workersContainer">
+      <div class="empty-state" id="emptyState">
+        <h2>No workers yet</h2>
+        <p>Create a new worker above or run a plan from CLI</p>
+      </div>
+      <div class="workers-grid" id="workersGrid"></div>
+    </div>
+  </div>
+
+  <!-- Merged Output Modal -->
+  <div class="modal-overlay" id="mergeModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Merged Output</h2>
+        <button onclick="closeMergeModal()">Close</button>
+      </div>
+      <div class="modal-body" id="mergeContent"></div>
+    </div>
+  </div>
+
+  <script>
+    let autoRefresh = null;
+
+    // Start auto-refresh every 3 seconds
+    function startAutoRefresh() {
+      if (autoRefresh) clearInterval(autoRefresh);
+      autoRefresh = setInterval(refreshWorkers, 3000);
+    }
+
+    async function refreshWorkers() {
+      try {
+        const res = await fetch('/api/workers');
+        const workers = await res.json();
+        renderWorkers(workers);
+        updateStats(workers);
+      } catch (err) {
+        console.error('Failed to refresh:', err);
+      }
+    }
+
+    function renderWorkers(workers) {
+      const grid = document.getElementById('workersGrid');
+      const empty = document.getElementById('emptyState');
+
+      if (workers.length === 0) {
+        empty.style.display = 'block';
+        grid.innerHTML = '';
+        return;
+      }
+
+      empty.style.display = 'none';
+      grid.innerHTML = workers.map(w => `
+        <div class="worker-card ${w.status}">
+          <div class="worker-header">
+            <span class="worker-name">${esc(w.name)}</span>
+            <span class="worker-status ${w.status}">${w.status.toUpperCase()}</span>
+          </div>
+          <div class="worker-body">
+            <div class="worker-time">
+              ${w.startedAt ? 'Started: ' + new Date(w.startedAt).toLocaleTimeString() : ''}
+              ${w.finishedAt ? ' | Finished: ' + new Date(w.finishedAt).toLocaleTimeString() : ''}
+            </div>
+            <div class="worker-output" id="output-${esc(w.name)}">Loading...</div>
+          </div>
+          <div class="worker-actions">
+            <button onclick="viewOutput('${esc(w.name)}')">Refresh Log</button>
+            ${w.status === 'running' ? `<button class="danger" onclick="stopWorker('${esc(w.name)}')">Stop</button>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      // Load outputs
+      workers.forEach(w => viewOutput(w.name));
+    }
+
+    function updateStats(workers) {
+      document.getElementById('statTotal').textContent = workers.length;
+      document.getElementById('statRunning').textContent = workers.filter(w => w.status === 'running').length;
+      document.getElementById('statDone').textContent = workers.filter(w => w.status === 'done').length;
+      document.getElementById('statError').textContent = workers.filter(w => w.status === 'error').length;
+    }
+
+    async function viewOutput(name) {
+      try {
+        const res = await fetch(`/api/workers/${encodeURIComponent(name)}/output`);
+        const data = await res.json();
+        const el = document.getElementById(`output-${name}`);
+        if (el) {
+          el.textContent = data.output || '(no output yet)';
+          el.scrollTop = el.scrollHeight;
+        }
+      } catch (err) {
+        console.error('Failed to get output:', err);
+      }
+    }
+
+    async function createWorker() {
+      const name = document.getElementById('workerName').value.trim();
+      const prompt = document.getElementById('workerPrompt').value.trim();
+
+      if (!name || !prompt) {
+        alert('Please enter both a name and a prompt.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/workers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, prompt }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('workerName').value = '';
+          document.getElementById('workerPrompt').value = '';
+          refreshWorkers();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (err) {
+        alert('Failed to create worker: ' + err.message);
+      }
+    }
+
+    async function stopWorker(name) {
+      if (!confirm(`Stop worker "${name}"?`)) return;
+      try {
+        await fetch(`/api/workers/${encodeURIComponent(name)}/stop`, { method: 'POST' });
+        refreshWorkers();
+      } catch (err) {
+        alert('Failed to stop worker: ' + err.message);
+      }
+    }
+
+    async function mergeAll() {
+      try {
+        const res = await fetch('/api/merge', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('mergeContent').textContent = data.output;
+          document.getElementById('mergeModal').classList.add('active');
+        }
+      } catch (err) {
+        alert('Failed to merge: ' + err.message);
+      }
+    }
+
+    async function cleanAll() {
+      if (!confirm('Remove all workers and their output?')) return;
+      try {
+        await fetch('/api/clean', { method: 'POST' });
+        refreshWorkers();
+      } catch (err) {
+        alert('Failed to clean: ' + err.message);
+      }
+    }
+
+    function closeMergeModal() {
+      document.getElementById('mergeModal').classList.remove('active');
+    }
+
+    function esc(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Init
+    refreshWorkers();
+    startAutoRefresh();
+  </script>
+</body>
+</html>
