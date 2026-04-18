@@ -36,6 +36,19 @@ export function writeTask(baseDir: string, workerName: string, prompt: string): 
   fs.writeFileSync(path.join(dir, 'task.md'), `# Task: ${workerName}\n\n${prompt}\n`);
 }
 
+export function readTask(baseDir: string, workerName: string): string | null {
+  const taskPath = path.join(getWorkerDir(baseDir, workerName), 'task.md');
+  if (!fs.existsSync(taskPath)) return null;
+  const raw = fs.readFileSync(taskPath, 'utf-8');
+  // Strip the "# Task: <name>\n\n" header; rest is the original prompt
+  return raw.replace(/^#\s*Task:.*\n+/, '').trimEnd();
+}
+
+export function clearOutput(baseDir: string, workerName: string): void {
+  const outputPath = path.join(getWorkerDir(baseDir, workerName), 'output.log');
+  if (fs.existsSync(outputPath)) fs.writeFileSync(outputPath, '');
+}
+
 export function writeStatus(baseDir: string, workerName: string, status: WorkerStatus): void {
   const dir = ensureWorkerDir(baseDir, workerName);
   fs.writeFileSync(path.join(dir, 'status.json'), JSON.stringify(status, null, 2));

@@ -503,6 +503,7 @@
           </div>
           <div class="error-output" id="errorOutput-${esc(w.name)}">Loading log...</div>
           <div class="error-actions">
+            <button class="primary" onclick="retryWorker('${esc(w.name)}')">Reset &amp; Retry</button>
             <button onclick="loadErrorOutput('${esc(w.name)}')">Refresh Log</button>
             <button onclick="copyErrorLog('${esc(w.name)}')">Copy Log</button>
           </div>
@@ -523,6 +524,22 @@
         }
       } catch (err) {
         console.error('Failed to get output:', err);
+      }
+    }
+
+    async function retryWorker(name) {
+      if (!confirm(`Reset and re-run worker "${name}" with its original prompt?`)) return;
+      try {
+        const res = await fetch(`/api/workers/${encodeURIComponent(name)}/retry`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          refreshWorkers();
+          switchTab('workers'); // jump back so user can watch it run
+        } else {
+          alert('Retry failed: ' + (data.error || 'unknown error'));
+        }
+      } catch (err) {
+        alert('Retry failed: ' + err.message);
       }
     }
 

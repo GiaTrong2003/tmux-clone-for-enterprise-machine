@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { listWorkers, readOutput, readStatus, cleanWorkers } from '../file-comm';
+import { listWorkers, readOutput, readStatus, readTask, clearOutput, cleanWorkers } from '../file-comm';
 import { spawnWorker, stopWorker } from '../worker';
 import { mergeOutputs } from '../merge';
 
@@ -52,6 +52,29 @@ export function startGui(baseDir: string): void {
   app.post('/api/workers/:name/stop', (req, res) => {
     const stopped = stopWorker(req.params.name);
     res.json({ success: stopped, name: req.params.name });
+  });
+
+  // API: Retry a worker — reuses original prompt, clears old output
+  app.post('/api/workers/:name/retry', (req, res) => {
+    const name = req.params.name;
+    const current = readStatus(baseDir, name);
+    if (current && current.status === 'running') {
+      res.status(409).json({ error: 'Worker is currently running. Stop it first.' });
+      return;
+    }
+    const prompt = readTask(baseDir, name);
+    if (!prompt) {
+      res.status(404).json({ error: 'Task file not found — cannot retry.' });
+      return;
+    }
+    try {
+      stopWorker(name); // no-op if not tracked; safety
+      clearOutput(baseDir, name);
+      spawnWorker(baseDir, { name, prompt });
+      res.json({ success: true, name });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // API: Merge all outputs
