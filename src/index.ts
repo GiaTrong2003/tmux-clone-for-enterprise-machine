@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import path from 'path';
 import { loadPlan, executePlan, listPlanWorkers } from './orchestrator';
 import { spawnWorker } from './worker';
