@@ -103,7 +103,7 @@ File này chứa sơ đồ ASCII mô tả cách ldmux hoạt động. Dùng kèm
   │ BƯỚC 3:  Tạo agent đầu tiên                             │
   │          ldmux create                                   │
   │          (wizard hỏi: name, soul, skill, cwd, model)    │
-  │          ────────► ~/.ldmux/workers/<name>/agent.json   │
+  │          ────────► <ldmux-install>/.ldmux/workers/<name>/agent.json   │
   └─────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -266,7 +266,7 @@ File này chứa sơ đồ ASCII mô tả cách ldmux hoạt động. Dùng kèm
   │   ldmux reset         │   │   ldmux clean           │
   │                       │   │                         │
   │   Lưu tại:            │   │   Lưu tại:              │
-  │   ~/.ldmux/           │   │   ./cwd/.ldmux/         │
+  │   <ldmux-install>/.ldmux/           │   │   ./cwd/.ldmux/         │
   │   (global)            │   │   (per-project)         │
   │                       │   │                         │
   │   Kết hợp Claude Code │   │   Chạy 1 lần xong       │
@@ -290,7 +290,7 @@ File này chứa sơ đồ ASCII mô tả cách ldmux hoạt động. Dùng kèm
 ## 6. Cấu trúc file — biết ở đâu để debug
 
 ```
-  ~/.ldmux/                         ← AGENT MODE (global)
+  <ldmux-install>/.ldmux/                         ← AGENT MODE (global)
   └── workers/
       └── backend-expert/
           ├── agent.json            # name, soul, skill, cwd, model
@@ -323,8 +323,8 @@ File này chứa sơ đồ ASCII mô tả cách ldmux hoạt động. Dùng kèm
   ┌──────────────────────────────────────────────────────────────┐
   │ ldmux MCP server (src/mcp-server.ts)                         │
   │                                                              │
-  │  1. Đọc ~/.ldmux/workers/backend-expert/agent.json           │
-  │  2. Đọc ~/.ldmux/workers/backend-expert/session.json         │
+  │  1. Đọc <ldmux-install>/.ldmux/workers/backend-expert/agent.json           │
+  │  2. Đọc <ldmux-install>/.ldmux/workers/backend-expert/session.json         │
   │     (nếu đã có sessionId)                                    │
   │  3. Gọi askAgent(baseDir, name, question)                    │
   └──────────────────┬───────────────────────────────────────────┘
@@ -467,7 +467,7 @@ File này chứa sơ đồ ASCII mô tả cách ldmux hoạt động. Dùng kèm
          │ không phải
          ▼
   ┌───────────────────┐
-  │ Agent "error"     │──► cat ~/.ldmux/workers/<name>/output.log
+  │ Agent "error"     │──► cat <ldmux-install>/.ldmux/workers/<name>/output.log
   │ state             │     rồi ldmux reset <name>
   └───────────────────┘
          │ không phải

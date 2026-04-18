@@ -1,5 +1,4 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 
 export interface WorkerStatus {
@@ -23,14 +22,23 @@ const LDMUX_DIR = '.ldmux';
 const WORKERS_DIR = path.join(LDMUX_DIR, 'workers');
 
 /**
- * Persistent agents (create/edit/ask/chat/reset + MCP) live in ~/.ldmux/
- * so they are shared across every project on the machine.
+ * Persistent agents (create/edit/ask/chat/reset + MCP) live in
+ * <ldmux-install-root>/.ldmux/workers/ — a folder inside the ldmux project
+ * itself. The location is resolved from this file's __dirname so it works
+ * the same whether the code runs from dist/ (built) or src/ (ts-node).
+ *
+ * Why here instead of $HOME? Users explicitly want agents tied to the
+ * ldmux install: they survive `npm run build` (which only touches dist/),
+ * they're gitignored (.ldmux/ is in .gitignore), and they are only wiped
+ * when the user deletes the folder by hand.
+ *
  * Batch workers (new/run/list/merge/gui/clean) continue to use cwd.
  */
 export function getAgentBaseDir(): string {
-  const dir = path.join(os.homedir(), LDMUX_DIR);
+  const ldmuxRoot = path.resolve(__dirname, '..');
+  const dir = path.join(ldmuxRoot, LDMUX_DIR, 'workers');
   fs.mkdirSync(dir, { recursive: true });
-  return os.homedir();
+  return ldmuxRoot;
 }
 
 export function getLdmuxDir(baseDir: string): string {

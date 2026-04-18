@@ -120,7 +120,7 @@ ldmux có 2 chế độ hoạt động rất khác nhau — dùng lẫn:
 
 | Chế độ | Mô tả | Dữ liệu lưu ở | Dùng khi |
 |---|---|---|---|
-| **Agent** (Layer 1+2) | Conversation persistent, hỏi đáp nhiều lần | `~/.ldmux/workers/` (**global**) | Tạo sẵn chuyên gia, dùng nhiều lần, tích hợp Claude Code |
+| **Agent** (Layer 1+2) | Conversation persistent, hỏi đáp nhiều lần | `<ldmux-install>/.ldmux/workers/` (**trong folder ldmux, dùng chung toàn máy**) | Tạo sẵn chuyên gia, dùng nhiều lần, tích hợp Claude Code |
 | **Batch** (legacy) | One-shot, chạy xong là hết | `./<cwd>/.ldmux/workers/` (**per-project**) | Chia task song song xong 1 lần |
 
 **Khi nào dùng chế độ nào:**
@@ -152,7 +152,7 @@ ldmux create
 # Create? Y
 ```
 
-Kết quả: `~/.ldmux/workers/backend-expert/agent.json` được tạo, status = `sleep`.
+Kết quả: `<ldmux-install>/.ldmux/workers/backend-expert/agent.json` được tạo, status = `sleep`.
 
 **Mẹo đặt soul:**
 - ❌ "You are a backend expert" (quá chung)
@@ -471,7 +471,7 @@ You: "Use ldmux to ask db-expert: 'should I use UUID or serial for user IDs?'"
 ### Điều quan trọng về MCP
 
 - **Stdio transport**: Claude Code spawn `ldmux mcp` như subprocess, giao tiếp qua JSON-RPC trên stdin/stdout. Không phải server http — không có port — mỗi parent claude là 1 instance ldmux riêng.
-- **Agent data được chia sẻ**: mọi instance ldmux mcp đều đọc/ghi `~/.ldmux/workers/` → nhiều parent Claude cùng lúc vẫn thấy cùng agent + cùng session (nhưng ghi đồng thời có thể race — không tối ưu cho nhiều parent).
+- **Agent data được chia sẻ**: mọi instance ldmux mcp đều đọc/ghi `<ldmux-install>/.ldmux/workers/` → nhiều parent Claude cùng lúc vẫn thấy cùng agent + cùng session (nhưng ghi đồng thời có thể race — không tối ưu cho nhiều parent).
 - **Lỗi MCP sẽ hiện trong Claude Code** với debug (`claude --debug`).
 
 ---
@@ -557,7 +557,7 @@ ldmux ask architect "nhac lai ly do chon Kafka thay vi RabbitMQ?"
 
 2 mode không đâm nhau vì:
 - Batch lưu `./cwd/.ldmux/`
-- Agent lưu `~/.ldmux/`
+- Agent lưu `<ldmux-install>/.ldmux/`
 
 ---
 
@@ -584,7 +584,7 @@ ldmux ask architect "nhac lai ly do chon Kafka thay vi RabbitMQ?"
 ### Về MCP
 
 - Chỉ support stdio transport hiện tại (không có http).
-- Parent Claude và ldmux mcp là 1-to-1 per-spawn — nếu bạn mở 2 parent Claude, có 2 instance ldmux mcp song song đọc/ghi cùng `~/.ldmux/` → có thể race.
+- Parent Claude và ldmux mcp là 1-to-1 per-spawn — nếu bạn mở 2 parent Claude, có 2 instance ldmux mcp song song đọc/ghi cùng `<ldmux-install>/.ldmux/` → có thể race.
 - Tool `ask_agent` return text + metadata. Parent Claude đọc `isError: true` để biết lỗi.
 
 ### Về security
@@ -617,10 +617,10 @@ ldmux ask architect "nhac lai ly do chon Kafka thay vi RabbitMQ?"
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | ldmux mcp
 
 # Xem state của agent
-cat ~/.ldmux/workers/<name>/agent.json
-cat ~/.ldmux/workers/<name>/session.json
-cat ~/.ldmux/workers/<name>/history.jsonl
-tail -50 ~/.ldmux/workers/<name>/output.log
+cat <ldmux-install>/.ldmux/workers/<name>/agent.json
+cat <ldmux-install>/.ldmux/workers/<name>/session.json
+cat <ldmux-install>/.ldmux/workers/<name>/history.jsonl
+tail -50 <ldmux-install>/.ldmux/workers/<name>/output.log
 
 # Claude Code debug MCP
 claude --debug mcp
@@ -633,10 +633,22 @@ claude -p "test" --output-format json
 
 ## 10. Cấu trúc file tham chiếu
 
-### Agent mode — global
+### Nếu bạn từ bản cũ (`~/.ldmux/`) nâng cấp
+
+Ldmux trước đây lưu agent tại `~/.ldmux/workers/`. Từ giờ chuyển sang `<ldmux-install>/.ldmux/workers/`. Nếu bạn có data cũ, copy sang:
+
+```bash
+# Chạy 1 lần để migrate
+mkdir -p <ldmux-install>/.ldmux/workers
+cp -r ~/.ldmux/workers/* <ldmux-install>/.ldmux/workers/
+rm -rf ~/.ldmux   # xoá data cũ sau khi verified
+ldmux agents       # verify các agent cũ vẫn còn + session stats
+```
+
+### Agent mode — trong folder ldmux
 
 ```
-~/.ldmux/workers/<agent-name>/
+<ldmux-install>/.ldmux/workers/<agent-name>/
 ├── agent.json      # { name, soul, skill, cwd, model, createdAt }
 ├── session.json    # { sessionId, turns, totalCostUsd, lastActiveAt }
 ├── status.json     # sleep | running | waiting | done | error

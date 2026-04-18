@@ -349,7 +349,7 @@ Thư mục `.ldmux/` đã có trong `.gitignore` nên không bị commit lên re
 
 ## Persistent Agents + MCP (Layer 2)
 
-Ngoài batch workers (one-shot), ldmux hỗ trợ **persistent agents** — mỗi agent là một conversation claude giữ qua session, có thể hỏi-đáp nhiều lần, nhớ context. Các agent lưu tại `~/.ldmux/workers/` — **dùng chung toàn máy**, không phụ thuộc thư mục hiện tại.
+Ngoài batch workers (one-shot), ldmux hỗ trợ **persistent agents** — mỗi agent là một conversation claude giữ qua session, có thể hỏi-đáp nhiều lần, nhớ context. Các agent lưu tại `<ldmux-install>/.ldmux/workers/` — **ngay bên trong thư mục ldmux đã cài**, sống sót qua `npm run build` (build chỉ ghi `dist/`), chỉ bị xoá khi bạn xoá thủ công hoặc `rm -rf .ldmux/` trong folder ldmux.
 
 ### Tạo và dùng agent qua CLI
 
@@ -459,7 +459,7 @@ Luồng này điểm khác biệt so với mở cửa sổ claude thứ 2 thủ 
 ### Cấu trúc file agent
 
 ```
-~/.ldmux/workers/<agent-name>/
+<ldmux-install>/.ldmux/workers/<agent-name>/
 ├── agent.json      # { name, soul, skill, cwd, model, createdAt }
 ├── session.json    # { sessionId, turns, totalCostUsd, lastActiveAt }
 ├── status.json     # sleep | running | waiting | done | error
