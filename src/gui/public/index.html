@@ -247,6 +247,116 @@
     .stat-dot.done { background: #3fb950; }
     .stat-dot.error { background: #f85149; }
     .stat-dot.total { background: #58a6ff; }
+
+    /* Tab navigation */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid #30363d;
+      margin-bottom: 24px;
+    }
+
+    .tab {
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      padding: 10px 18px;
+      cursor: pointer;
+      font-size: 14px;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab:hover { color: #c9d1d9; }
+
+    .tab.active {
+      color: #58a6ff;
+      border-bottom-color: #58a6ff;
+    }
+
+    .tab-badge {
+      background: #21262d;
+      color: #8b949e;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .tab-badge.error { background: #f8514930; color: #f85149; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* Error cards — bigger than normal worker cards, full width */
+    .error-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-left: 3px solid #f85149;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .error-header {
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .error-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .error-message {
+      padding: 12px 18px;
+      background: #f8514915;
+      color: #f85149;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 13px;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .error-message strong {
+      color: #ffa198;
+      margin-right: 8px;
+    }
+
+    .error-meta {
+      padding: 8px 18px;
+      font-size: 12px;
+      color: #8b949e;
+      display: flex;
+      gap: 16px;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .error-output {
+      background: #0d1117;
+      padding: 14px 18px;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      max-height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #c9d1d9;
+    }
+
+    .error-actions {
+      padding: 10px 18px;
+      display: flex;
+      gap: 8px;
+      border-top: 1px solid #21262d;
+    }
   </style>
 </head>
 <body>
@@ -278,13 +388,32 @@
       <div class="stat"><span class="stat-dot error"></span> Error: <strong id="statError">0</strong></div>
     </div>
 
-    <!-- Workers -->
-    <div id="workersContainer">
+    <!-- Tab navigation -->
+    <div class="tabs">
+      <button class="tab active" data-view="workers" onclick="switchTab('workers')">
+        Workers <span class="tab-badge" id="tabBadgeWorkers">0</span>
+      </button>
+      <button class="tab" data-view="errors" onclick="switchTab('errors')">
+        Errors <span class="tab-badge error" id="tabBadgeErrors">0</span>
+      </button>
+    </div>
+
+    <!-- Workers view -->
+    <div class="view active" id="viewWorkers">
       <div class="empty-state" id="emptyState">
         <h2>No workers yet</h2>
         <p>Create a new worker above or run a plan from CLI</p>
       </div>
       <div class="workers-grid" id="workersGrid"></div>
+    </div>
+
+    <!-- Errors view -->
+    <div class="view" id="viewErrors">
+      <div class="empty-state" id="emptyErrors">
+        <h2>No errors</h2>
+        <p>When a worker fails, detailed logs will appear here.</p>
+      </div>
+      <div id="errorsList"></div>
     </div>
   </div>
 
@@ -301,6 +430,8 @@
 
   <script>
     let autoRefresh = null;
+    let currentView = 'workers';
+    let lastWorkers = [];
 
     // Start auto-refresh every 3 seconds
     function startAutoRefresh() {
@@ -308,14 +439,101 @@
       autoRefresh = setInterval(refreshWorkers, 3000);
     }
 
+    function switchTab(view) {
+      currentView = view;
+      document.querySelectorAll('.tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.view === view);
+      });
+      document.getElementById('viewWorkers').classList.toggle('active', view === 'workers');
+      document.getElementById('viewErrors').classList.toggle('active', view === 'errors');
+      renderCurrentView();
+    }
+
+    function renderCurrentView() {
+      if (currentView === 'errors') {
+        renderErrors(lastWorkers.filter(w => w.status === 'error'));
+      } else {
+        renderWorkers(lastWorkers);
+      }
+    }
+
     async function refreshWorkers() {
       try {
         const res = await fetch('/api/workers');
         const workers = await res.json();
-        renderWorkers(workers);
+        lastWorkers = workers;
         updateStats(workers);
+        updateTabBadges(workers);
+        renderCurrentView();
       } catch (err) {
         console.error('Failed to refresh:', err);
+      }
+    }
+
+    function updateTabBadges(workers) {
+      document.getElementById('tabBadgeWorkers').textContent = workers.length;
+      document.getElementById('tabBadgeErrors').textContent =
+        workers.filter(w => w.status === 'error').length;
+    }
+
+    function renderErrors(errors) {
+      const list = document.getElementById('errorsList');
+      const empty = document.getElementById('emptyErrors');
+
+      if (errors.length === 0) {
+        empty.style.display = 'block';
+        list.innerHTML = '';
+        return;
+      }
+
+      empty.style.display = 'none';
+      list.innerHTML = errors.map(w => `
+        <div class="error-card">
+          <div class="error-header">
+            <span class="error-title">${esc(w.name)}</span>
+            <span class="worker-status error">ERROR</span>
+          </div>
+          <div class="error-message">
+            <strong>Error:</strong>${esc(w.error || 'Unknown error (process exited unexpectedly)')}
+          </div>
+          <div class="error-meta">
+            ${w.pid ? 'PID: ' + w.pid : ''}
+            ${w.startedAt ? '<span>Started: ' + new Date(w.startedAt).toLocaleString() + '</span>' : ''}
+            ${w.finishedAt ? '<span>Finished: ' + new Date(w.finishedAt).toLocaleString() + '</span>' : ''}
+          </div>
+          <div class="error-output" id="errorOutput-${esc(w.name)}">Loading log...</div>
+          <div class="error-actions">
+            <button onclick="loadErrorOutput('${esc(w.name)}')">Refresh Log</button>
+            <button onclick="copyErrorLog('${esc(w.name)}')">Copy Log</button>
+          </div>
+        </div>
+      `).join('');
+
+      errors.forEach(w => loadErrorOutput(w.name));
+    }
+
+    async function loadErrorOutput(name) {
+      try {
+        const res = await fetch(`/api/workers/${encodeURIComponent(name)}/output`);
+        const data = await res.json();
+        const el = document.getElementById(`errorOutput-${name}`);
+        if (el) {
+          el.textContent = data.output || '(no output captured)';
+          el.scrollTop = el.scrollHeight;
+        }
+      } catch (err) {
+        console.error('Failed to get output:', err);
+      }
+    }
+
+    async function copyErrorLog(name) {
+      const el = document.getElementById(`errorOutput-${name}`);
+      if (!el) return;
+      try {
+        await navigator.clipboard.writeText(el.textContent);
+        alert('Log copied to clipboard');
+      } catch {
+        alert('Failed to copy — select the text manually');
       }
     }
 
