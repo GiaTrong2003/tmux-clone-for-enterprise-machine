@@ -364,6 +364,7 @@
     <h1>ldmux <span>Dashboard</span></h1>
     <div class="header-actions">
       <button onclick="refreshWorkers()">Refresh</button>
+      <button id="pauseBtn" onclick="toggleAutoRefresh()">Pause auto-refresh</button>
       <button class="primary" onclick="mergeAll()">Merge All</button>
       <button class="danger" onclick="cleanAll()">Clean All</button>
     </div>
@@ -432,11 +433,21 @@
     let autoRefresh = null;
     let currentView = 'workers';
     let lastWorkers = [];
+    let autoRefreshPaused = false;
+    const REFRESH_MS = 3000;
 
     // Start auto-refresh every 3 seconds
     function startAutoRefresh() {
       if (autoRefresh) clearInterval(autoRefresh);
-      autoRefresh = setInterval(refreshWorkers, 3000);
+      autoRefresh = setInterval(() => { if (!autoRefreshPaused) refreshWorkers(); }, REFRESH_MS);
+    }
+
+    function toggleAutoRefresh() {
+      autoRefreshPaused = !autoRefreshPaused;
+      const btn = document.getElementById('pauseBtn');
+      btn.textContent = autoRefreshPaused ? 'Resume auto-refresh' : 'Pause auto-refresh';
+      btn.style.background = autoRefreshPaused ? '#da3633' : '#21262d';
+      btn.style.color = autoRefreshPaused ? '#fff' : '#c9d1d9';
     }
 
     function switchTab(view) {
@@ -476,41 +487,64 @@
         workers.filter(w => w.status === 'error').length;
     }
 
+    function buildErrorCardHtml(w) {
+      const safe = esc(w.name);
+      return `
+        <div class="error-header">
+          <span class="error-title">${safe}</span>
+          <span class="worker-status error">ERROR</span>
+        </div>
+        <div class="error-message" data-role="msg">
+          <strong>Error:</strong>${esc(w.error || 'Unknown error (process exited unexpectedly)')}
+        </div>
+        <div class="error-meta" data-role="meta">
+          ${w.pid ? 'PID: ' + w.pid : ''}
+          ${w.startedAt ? '<span>Started: ' + new Date(w.startedAt).toLocaleString() + '</span>' : ''}
+          ${w.finishedAt ? '<span>Finished: ' + new Date(w.finishedAt).toLocaleString() + '</span>' : ''}
+        </div>
+        <div class="error-output" id="errorOutput-${safe}">Loading log...</div>
+        <div class="error-actions">
+          <button class="primary" onclick="retryWorker('${safe}')">Reset &amp; Retry</button>
+          <button onclick="loadErrorOutput('${safe}')">Refresh Log</button>
+          <button onclick="copyErrorLog('${safe}')">Copy Log</button>
+        </div>
+      `;
+    }
+
     function renderErrors(errors) {
       const list = document.getElementById('errorsList');
       const empty = document.getElementById('emptyErrors');
 
       if (errors.length === 0) {
         empty.style.display = 'block';
-        list.innerHTML = '';
+        while (list.firstChild) list.removeChild(list.firstChild);
         return;
       }
-
       empty.style.display = 'none';
-      list.innerHTML = errors.map(w => `
-        <div class="error-card">
-          <div class="error-header">
-            <span class="error-title">${esc(w.name)}</span>
-            <span class="worker-status error">ERROR</span>
-          </div>
-          <div class="error-message">
-            <strong>Error:</strong>${esc(w.error || 'Unknown error (process exited unexpectedly)')}
-          </div>
-          <div class="error-meta">
-            ${w.pid ? 'PID: ' + w.pid : ''}
-            ${w.startedAt ? '<span>Started: ' + new Date(w.startedAt).toLocaleString() + '</span>' : ''}
-            ${w.finishedAt ? '<span>Finished: ' + new Date(w.finishedAt).toLocaleString() + '</span>' : ''}
-          </div>
-          <div class="error-output" id="errorOutput-${esc(w.name)}">Loading log...</div>
-          <div class="error-actions">
-            <button class="primary" onclick="retryWorker('${esc(w.name)}')">Reset &amp; Retry</button>
-            <button onclick="loadErrorOutput('${esc(w.name)}')">Refresh Log</button>
-            <button onclick="copyErrorLog('${esc(w.name)}')">Copy Log</button>
-          </div>
-        </div>
-      `).join('');
 
-      errors.forEach(w => loadErrorOutput(w.name));
+      const currentNames = new Set(errors.map(w => w.name));
+      list.querySelectorAll('.error-card').forEach(card => {
+        if (!currentNames.has(card.dataset.workerName)) card.remove();
+      });
+
+      for (const w of errors) {
+        let card = list.querySelector(
+          `.error-card[data-worker-name="${CSS.escape(w.name)}"]`
+        );
+        if (!card) {
+          card = document.createElement('div');
+          card.className = 'error-card';
+          card.dataset.workerName = w.name;
+          card.innerHTML = buildErrorCardHtml(w);
+          list.appendChild(card);
+        }
+        // Error message + meta rarely change once errored, but patch anyway
+        const msg = card.querySelector('[data-role="msg"]');
+        const wantedMsg = `<strong>Error:</strong>${esc(w.error || 'Unknown error (process exited unexpectedly)')}`;
+        if (msg.innerHTML !== wantedMsg) msg.innerHTML = wantedMsg;
+
+        loadErrorOutput(w.name);
+      }
     }
 
     async function loadErrorOutput(name) {
@@ -518,10 +552,13 @@
         const res = await fetch(`/api/workers/${encodeURIComponent(name)}/output`);
         const data = await res.json();
         const el = document.getElementById(`errorOutput-${name}`);
-        if (el) {
-          el.textContent = data.output || '(no output captured)';
-          el.scrollTop = el.scrollHeight;
-        }
+        if (!el) return;
+        const newText = data.output || '(no output captured)';
+        if (el.textContent === newText) return;
+        const wasAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+        const prevScroll = el.scrollTop;
+        el.textContent = newText;
+        el.scrollTop = wasAtBottom ? el.scrollHeight : prevScroll;
       } catch (err) {
         console.error('Failed to get output:', err);
       }
@@ -554,39 +591,88 @@
       }
     }
 
+    function buildCardHtml(w) {
+      const safe = esc(w.name);
+      return `
+        <div class="worker-header">
+          <span class="worker-name">${safe}</span>
+          <span class="worker-status ${w.status}" data-role="status">${w.status.toUpperCase()}</span>
+        </div>
+        <div class="worker-body">
+          <div class="worker-time" data-role="time">
+            ${w.startedAt ? 'Started: ' + new Date(w.startedAt).toLocaleTimeString() : ''}
+            ${w.finishedAt ? ' | Finished: ' + new Date(w.finishedAt).toLocaleTimeString() : ''}
+          </div>
+          <div class="worker-output" id="output-${safe}">Loading...</div>
+        </div>
+        <div class="worker-actions" data-role="actions">
+          <button onclick="viewOutput('${safe}')">Refresh Log</button>
+          ${w.status === 'running' ? `<button class="danger" onclick="stopWorker('${safe}')">Stop</button>` : ''}
+        </div>
+      `;
+    }
+
     function renderWorkers(workers) {
       const grid = document.getElementById('workersGrid');
       const empty = document.getElementById('emptyState');
 
       if (workers.length === 0) {
         empty.style.display = 'block';
-        grid.innerHTML = '';
+        // remove any existing cards without a full innerHTML rewrite
+        while (grid.firstChild) grid.removeChild(grid.firstChild);
         return;
       }
-
       empty.style.display = 'none';
-      grid.innerHTML = workers.map(w => `
-        <div class="worker-card ${w.status}">
-          <div class="worker-header">
-            <span class="worker-name">${esc(w.name)}</span>
-            <span class="worker-status ${w.status}">${w.status.toUpperCase()}</span>
-          </div>
-          <div class="worker-body">
-            <div class="worker-time">
-              ${w.startedAt ? 'Started: ' + new Date(w.startedAt).toLocaleTimeString() : ''}
-              ${w.finishedAt ? ' | Finished: ' + new Date(w.finishedAt).toLocaleTimeString() : ''}
-            </div>
-            <div class="worker-output" id="output-${esc(w.name)}">Loading...</div>
-          </div>
-          <div class="worker-actions">
-            <button onclick="viewOutput('${esc(w.name)}')">Refresh Log</button>
-            ${w.status === 'running' ? `<button class="danger" onclick="stopWorker('${esc(w.name)}')">Stop</button>` : ''}
-          </div>
-        </div>
-      `).join('');
 
-      // Load outputs
-      workers.forEach(w => viewOutput(w.name));
+      // Delete cards for workers that no longer exist
+      const currentNames = new Set(workers.map(w => w.name));
+      grid.querySelectorAll('.worker-card').forEach(card => {
+        if (!currentNames.has(card.dataset.workerName)) card.remove();
+      });
+
+      // Upsert each worker: create if missing, otherwise patch in place
+      for (const w of workers) {
+        let card = grid.querySelector(
+          `.worker-card[data-worker-name="${CSS.escape(w.name)}"]`
+        );
+
+        if (!card) {
+          card = document.createElement('div');
+          card.className = `worker-card ${w.status}`;
+          card.dataset.workerName = w.name;
+          card.innerHTML = buildCardHtml(w);
+          grid.appendChild(card);
+        } else {
+          // Update status class only if changed (prevents unnecessary reflow)
+          const wantedCls = `worker-card ${w.status}`;
+          if (card.className !== wantedCls) card.className = wantedCls;
+
+          const badge = card.querySelector('[data-role="status"]');
+          const wantedBadge = `worker-status ${w.status}`;
+          if (badge.className !== wantedBadge) badge.className = wantedBadge;
+          const badgeText = w.status.toUpperCase();
+          if (badge.textContent !== badgeText) badge.textContent = badgeText;
+
+          const time = card.querySelector('[data-role="time"]');
+          const wantedTime =
+            (w.startedAt ? 'Started: ' + new Date(w.startedAt).toLocaleTimeString() : '') +
+            (w.finishedAt ? ' | Finished: ' + new Date(w.finishedAt).toLocaleTimeString() : '');
+          if (time.textContent.trim() !== wantedTime.trim()) time.textContent = wantedTime;
+
+          // Repaint actions only if the Stop button presence should change
+          const actions = card.querySelector('[data-role="actions"]');
+          const hasStop = !!actions.querySelector('button.danger');
+          const wantStop = w.status === 'running';
+          if (hasStop !== wantStop) {
+            actions.innerHTML = `
+              <button onclick="viewOutput('${esc(w.name)}')">Refresh Log</button>
+              ${wantStop ? `<button class="danger" onclick="stopWorker('${esc(w.name)}')">Stop</button>` : ''}
+            `;
+          }
+        }
+
+        viewOutput(w.name);
+      }
     }
 
     function updateStats(workers) {
@@ -601,10 +687,15 @@
         const res = await fetch(`/api/workers/${encodeURIComponent(name)}/output`);
         const data = await res.json();
         const el = document.getElementById(`output-${name}`);
-        if (el) {
-          el.textContent = data.output || '(no output yet)';
-          el.scrollTop = el.scrollHeight;
-        }
+        if (!el) return;
+        const newText = data.output || '(no output yet)';
+        if (el.textContent === newText) return; // no change, don't touch DOM
+        // Preserve scroll state: if user was at the bottom, stay pinned to bottom;
+        // otherwise keep their current scroll position.
+        const wasAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+        const prevScroll = el.scrollTop;
+        el.textContent = newText;
+        el.scrollTop = wasAtBottom ? el.scrollHeight : prevScroll;
       } catch (err) {
         console.error('Failed to get output:', err);
       }
