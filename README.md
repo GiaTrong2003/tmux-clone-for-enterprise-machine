@@ -347,6 +347,126 @@ Thu muc `.ldmux/` da co trong `.gitignore` nen khong bi commit len repo.
 | Pane khong mo tren Mac/Linux | Dung — `wt` chi co tren Windows. Dung `ldmux run plan.json --no-pane` va xem output qua `ldmux gui` |
 | Sua code TS xong khong thay cap nhat | Quen chay `npm run build` — lenh `ldmux` toan cuc tro toi `dist/` chu khong phai `src/` |
 
+## Persistent Agents + MCP (Layer 2)
+
+Ngoai batch workers (one-shot), ldmux ho tro **persistent agents** — moi agent la mot conversation claude giu qua session, co the hoi-dap nhieu lan, nho context. Cac agent luu tai `~/.ldmux/workers/` — **dung chung toan may**, khong phu thuoc thu muc hien tai.
+
+### Tao va dung agent qua CLI
+
+```bash
+# 1. Tao agent moi (interactive wizard)
+ldmux create
+#   - Name:  backend-expert
+#   - Soul:  "You are a pragmatic backend architect..."
+#   - Skill: "Java Spring, PostgreSQL"
+#   - Cwd, Model: optional
+
+# 2. Hoi agent
+ldmux ask backend-expert "how does JWT validation work?"
+
+# 3. Chat REPL
+ldmux chat backend-expert
+#   You > ...
+#   /history   -> xem lich su
+#   /session   -> xem session info
+#   /exit      -> thoat
+
+# 4. Quan ly
+ldmux agents                # liet ke tat ca agent + session stats
+ldmux edit backend-expert   # doi soul/skill/model (se hoi reset neu soul/skill doi)
+ldmux reset backend-expert  # xoa session + history, giu nguyen soul/skill
+```
+
+**Luu y:** `--system-prompt` cua claude chi gan vao conversation khi tao session. Neu doi soul/skill ma muon hieu luc, phai `ldmux reset` de tao session moi.
+
+### Tich hop voi Claude Code qua MCP
+
+ldmux expose MCP stdio server voi 4 tool: `list_agents`, `ask_agent`, `get_agent_history`, `create_agent`. Parent Claude Code se thay cac tool nay nhu tool thuan va tu goi khi can.
+
+**Buoc 1** — Tao file MCP config (hoac them vao `~/.claude.json` > `mcpServers`):
+
+```json
+{
+  "mcpServers": {
+    "ldmux": {
+      "command": "ldmux",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Neu chua `npm link`, dung full path:
+
+```json
+{
+  "mcpServers": {
+    "ldmux": {
+      "command": "node",
+      "args": ["/abs/path/to/ldmux/dist/index.js", "mcp"]
+    }
+  }
+}
+```
+
+**Buoc 2** — Khoi dong Claude Code voi MCP config:
+
+```bash
+# Dung file config rieng
+claude --mcp-config /path/to/ldmux-mcp.json
+
+# Hoac neu da them vao ~/.claude.json thi chi can
+claude
+```
+
+**Buoc 3** — Parent Claude tu dong co cac tool `mcp__ldmux__list_agents`, `mcp__ldmux__ask_agent`, ... Bat allowed tools bang setting trong `~/.claude/settings.json`:
+
+```json
+{
+  "allowedTools": ["mcp__ldmux"]
+}
+```
+
+Hoac chay 1 lan voi flag:
+
+```bash
+claude --allowedTools "mcp__ldmux" --permission-mode dontAsk
+```
+
+### Vi du use case
+
+Ban dang lam frontend trong `/repo/fe`. Parent Claude can biet auth flow cua backend.
+
+```
+User  : "How does the backend validate my JWT?"
+Parent: [calls list_agents] -> sees backend-expert with skill "Spring Boot, OAuth"
+Parent: [calls ask_agent(backend-expert, "explain JWT validation flow")]
+Agent : <answer tu backend-expert, dung cwd=/repo/be cua chinh no>
+Parent: [tong hop answer + implement tren frontend]
+```
+
+Luong nay diem khac biet so voi mo cua so claude thu 2 thu cong: parent tu quyet dinh goi, tu tong hop, conversation giua user va parent khong bi gian doan.
+
+### MCP tools reference
+
+| Tool | Input | Output |
+|------|-------|--------|
+| `list_agents` | (none) | JSON array: name, soul, skill, cwd, model, status, turns, totalCostUsd |
+| `ask_agent` | `name`, `question` | Agent's answer + session meta |
+| `get_agent_history` | `name`, `limit?` | JSONL: role, content, timestamp, durationMs, costUsd |
+| `create_agent` | `name`, `soul?`, `skill?`, `cwd?`, `model?`, `overwrite?` | Created config |
+
+### Cau truc file agent
+
+```
+~/.ldmux/workers/<agent-name>/
+├── agent.json      # { name, soul, skill, cwd, model, createdAt }
+├── session.json    # { sessionId, turns, totalCostUsd, lastActiveAt }
+├── status.json     # sleep | running | waiting | done | error
+├── history.jsonl   # moi dong = 1 turn (user/assistant)
+└── output.log      # raw JSON output cua claude moi lan ask (debug)
+```
+
 ## License
 
 MIT

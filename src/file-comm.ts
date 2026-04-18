@@ -1,17 +1,37 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 export interface WorkerStatus {
   name: string;
-  status: 'pending' | 'running' | 'done' | 'error';
+  status: 'pending' | 'running' | 'waiting' | 'sleep' | 'done' | 'error';
   pid?: number;
   startedAt?: string;
   finishedAt?: string;
+  lastActiveAt?: string;
   error?: string;
+}
+
+export interface AgentSession {
+  sessionId: string;
+  turns: number;
+  totalCostUsd: number;
+  lastActiveAt: string;
 }
 
 const LDMUX_DIR = '.ldmux';
 const WORKERS_DIR = path.join(LDMUX_DIR, 'workers');
+
+/**
+ * Persistent agents (create/edit/ask/chat/reset + MCP) live in ~/.ldmux/
+ * so they are shared across every project on the machine.
+ * Batch workers (new/run/list/merge/gui/clean) continue to use cwd.
+ */
+export function getAgentBaseDir(): string {
+  const dir = path.join(os.homedir(), LDMUX_DIR);
+  fs.mkdirSync(dir, { recursive: true });
+  return os.homedir();
+}
 
 export function getLdmuxDir(baseDir: string): string {
   return path.join(baseDir, LDMUX_DIR);
@@ -47,6 +67,32 @@ export function readTask(baseDir: string, workerName: string): string | null {
 export function clearOutput(baseDir: string, workerName: string): void {
   const outputPath = path.join(getWorkerDir(baseDir, workerName), 'output.log');
   if (fs.existsSync(outputPath)) fs.writeFileSync(outputPath, '');
+}
+
+export function readSession(baseDir: string, workerName: string): AgentSession | null {
+  const p = path.join(getWorkerDir(baseDir, workerName), 'session.json');
+  if (!fs.existsSync(p)) return null;
+  return JSON.parse(fs.readFileSync(p, 'utf-8'));
+}
+
+export function writeSession(baseDir: string, workerName: string, session: AgentSession): void {
+  const dir = ensureWorkerDir(baseDir, workerName);
+  fs.writeFileSync(path.join(dir, 'session.json'), JSON.stringify(session, null, 2));
+}
+
+export function appendHistory(
+  baseDir: string,
+  workerName: string,
+  entry: { role: 'user' | 'assistant'; content: string; timestamp: string; durationMs?: number; costUsd?: number }
+): void {
+  const dir = ensureWorkerDir(baseDir, workerName);
+  fs.appendFileSync(path.join(dir, 'history.jsonl'), JSON.stringify(entry) + '\n');
+}
+
+export function readHistory(baseDir: string, workerName: string): any[] {
+  const p = path.join(getWorkerDir(baseDir, workerName), 'history.jsonl');
+  if (!fs.existsSync(p)) return [];
+  return fs.readFileSync(p, 'utf-8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
 }
 
 export function writeStatus(baseDir: string, workerName: string, status: WorkerStatus): void {
