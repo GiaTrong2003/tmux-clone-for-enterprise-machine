@@ -1,12 +1,14 @@
 import express from 'express';
 import path from 'path';
-import { listWorkers, readOutput, readStatus, readTask, clearOutput, cleanWorkers } from '../file-comm';
+import { listWorkers, readOutput, readStatus, readTask, clearOutput, cleanWorkers, readSession } from '../file-comm';
 import { spawnWorker, stopWorker } from '../worker';
 import { mergeOutputs } from '../merge';
+import { listAgents, readAgentConfig, updateAgentConfig, deleteAgent } from '../agent-config';
+import { resetAgent } from '../agent';
 
 const PORT = 3700;
 
-export function startGui(baseDir: string): void {
+export function startGui(baseDir: string, agentDir: string = baseDir): void {
   const app = express();
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
@@ -74,6 +76,100 @@ export function startGui(baseDir: string): void {
       res.json({ success: true, name });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- Persistent agents ---
+
+  // API: List all agents (those with agent.json) + session stats
+  app.get('/api/agents', (_req, res) => {
+    const agents = listAgents(agentDir).map(cfg => {
+      const session = readSession(agentDir, cfg.name);
+      const status = readStatus(agentDir, cfg.name);
+      return {
+        ...cfg,
+        status: status?.status,
+        turns: session?.turns ?? 0,
+        totalCostUsd: session?.totalCostUsd ?? 0,
+        lastActiveAt: session?.lastActiveAt,
+        hasSession: !!session,
+      };
+    });
+    res.json(agents);
+  });
+
+  // API: Get single agent config + session/status
+  app.get('/api/agents/:name', (req, res) => {
+    const cfg = readAgentConfig(agentDir, req.params.name);
+    if (!cfg) {
+      res.status(404).json({ error: 'Agent not found' });
+      return;
+    }
+    const session = readSession(agentDir, cfg.name);
+    const status = readStatus(agentDir, cfg.name);
+    res.json({
+      ...cfg,
+      status: status?.status,
+      turns: session?.turns ?? 0,
+      totalCostUsd: session?.totalCostUsd ?? 0,
+      lastActiveAt: session?.lastActiveAt,
+      hasSession: !!session,
+    });
+  });
+
+  // API: Update agent config (soul/skill/cwd/model). Pass null to clear a field.
+  // Query `?reset=true` resets the session after save (applies new soul/skill).
+  app.patch('/api/agents/:name', (req, res) => {
+    const { soul, skill, cwd, model } = req.body ?? {};
+    const status = readStatus(agentDir, req.params.name);
+    if (status?.status === 'running') {
+      res.status(409).json({ error: 'Agent is running. Wait for it to finish before editing.' });
+      return;
+    }
+    try {
+      const { updated, soulOrSkillChanged } = updateAgentConfig(agentDir, req.params.name, {
+        soul, skill, cwd, model,
+      });
+      let didReset = false;
+      if (req.query.reset === 'true' && soulOrSkillChanged) {
+        resetAgent(agentDir, req.params.name);
+        didReset = true;
+      }
+      res.json({ success: true, updated, soulOrSkillChanged, didReset });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // API: Delete agent (removes entire folder: config, session, history, logs)
+  app.delete('/api/agents/:name', (req, res) => {
+    const status = readStatus(agentDir, req.params.name);
+    if (status?.status === 'running') {
+      res.status(409).json({ error: 'Agent is running. Stop or wait before deleting.' });
+      return;
+    }
+    try {
+      deleteAgent(agentDir, req.params.name);
+      res.json({ success: true });
+    } catch (err: any) {
+      const msg = err.message as string;
+      const code = msg.includes('not found') ? 404 : 400;
+      res.status(code).json({ error: msg });
+    }
+  });
+
+  // API: Reset agent session (keeps soul/skill, wipes history + session)
+  app.post('/api/agents/:name/reset', (req, res) => {
+    const status = readStatus(agentDir, req.params.name);
+    if (status?.status === 'running') {
+      res.status(409).json({ error: 'Agent is running. Stop or wait before resetting.' });
+      return;
+    }
+    try {
+      resetAgent(agentDir, req.params.name);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
     }
   });
 

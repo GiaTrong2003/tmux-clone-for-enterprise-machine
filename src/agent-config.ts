@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ensureWorkerDir, getWorkerDir } from './file-comm';
+import { ensureWorkerDir, getWorkerDir, getWorkersDir } from './file-comm';
 
 export interface AgentConfig {
   name: string;
@@ -48,6 +48,62 @@ export function createAgent(
   };
   writeAgentConfig(baseDir, cfg);
   return cfg;
+}
+
+export function listAgents(baseDir: string): AgentConfig[] {
+  const workersDir = getWorkersDir(baseDir);
+  if (!fs.existsSync(workersDir)) return [];
+  return fs.readdirSync(workersDir)
+    .map(name => readAgentConfig(baseDir, name))
+    .filter((cfg): cfg is AgentConfig => cfg !== null);
+}
+
+export interface AgentUpdate {
+  soul?: string | null;
+  skill?: string | null;
+  cwd?: string | null;
+  model?: string | null;
+}
+
+// Returns { updated, soulOrSkillChanged } — caller decides whether to reset session.
+// Pass `null` on a field to clear it; omit to leave unchanged.
+export function updateAgentConfig(
+  baseDir: string,
+  name: string,
+  patch: AgentUpdate
+): { updated: AgentConfig; soulOrSkillChanged: boolean } {
+  const existing = readAgentConfig(baseDir, name);
+  if (!existing) throw new Error(`Agent "${name}" not found`);
+
+  const apply = (cur: string | undefined, next: string | null | undefined): string | undefined => {
+    if (next === undefined) return cur;
+    if (next === null || next === '') return undefined;
+    return next;
+  };
+
+  const updated: AgentConfig = {
+    ...existing,
+    soul: apply(existing.soul, patch.soul),
+    skill: apply(existing.skill, patch.skill),
+    cwd: apply(existing.cwd, patch.cwd),
+    model: apply(existing.model, patch.model),
+  };
+
+  const soulOrSkillChanged =
+    (updated.soul ?? '') !== (existing.soul ?? '') ||
+    (updated.skill ?? '') !== (existing.skill ?? '');
+
+  writeAgentConfig(baseDir, updated);
+  return { updated, soulOrSkillChanged };
+}
+
+export function deleteAgent(baseDir: string, name: string): void {
+  const dir = getWorkerDir(baseDir, name);
+  if (!fs.existsSync(dir)) throw new Error(`Agent "${name}" not found`);
+  if (!agentExists(baseDir, name)) {
+    throw new Error(`"${name}" is a batch worker, not a persistent agent. Use cleanWorkers for that.`);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 export function buildSystemPrompt(cfg: AgentConfig): string | undefined {

@@ -198,7 +198,7 @@ async function main(): Promise<void> {
     }
 
     case 'gui': {
-      startGui(BASE_DIR);
+      startGui(BASE_DIR, AGENT_DIR);
       break;
     }
 

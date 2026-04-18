@@ -357,6 +357,98 @@
       gap: 8px;
       border-top: 1px solid #21262d;
     }
+
+    /* Agent cards */
+    .agent-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-left: 3px solid #a371f7;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .agent-header {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #21262d;
+    }
+    .agent-name { font-weight: 600; font-size: 15px; color: #d2a8ff; }
+    .agent-meta-row {
+      padding: 10px 16px;
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 6px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .agent-meta-label { color: #8b949e; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; padding-top: 2px; }
+    .agent-meta-value { color: #c9d1d9; word-break: break-word; }
+    .agent-meta-value.muted { color: #6e7681; font-style: italic; }
+    .agent-stats {
+      padding: 8px 16px;
+      display: flex;
+      gap: 20px;
+      font-size: 12px;
+      color: #8b949e;
+      border-top: 1px solid #21262d;
+      border-bottom: 1px solid #21262d;
+    }
+    .agent-stats strong { color: #c9d1d9; font-weight: 600; }
+    .agent-actions {
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Edit modal */
+    .modal-form { display: flex; flex-direction: column; gap: 14px; padding: 20px; overflow-y: auto; }
+    .modal-form label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .modal-form input, .modal-form textarea {
+      font-size: 14px;
+      text-transform: none;
+      letter-spacing: normal;
+      color: #c9d1d9;
+    }
+    .modal-form textarea { min-height: 80px; resize: vertical; }
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid #30363d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .reset-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #c9d1d9;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+    .reset-checkbox input { width: auto; }
+    .modal-warn {
+      margin: 0 20px;
+      padding: 10px 12px;
+      background: #f0883e20;
+      border: 1px solid #f0883e;
+      border-radius: 6px;
+      color: #f0883e;
+      font-size: 12px;
+      display: none;
+    }
+    .modal-warn.active { display: block; }
   </style>
 </head>
 <body>
@@ -397,6 +489,9 @@
       <button class="tab" data-view="errors" onclick="switchTab('errors')">
         Errors <span class="tab-badge error" id="tabBadgeErrors">0</span>
       </button>
+      <button class="tab" data-view="agents" onclick="switchTab('agents')">
+        Agents <span class="tab-badge" id="tabBadgeAgents">0</span>
+      </button>
     </div>
 
     <!-- Workers view -->
@@ -416,6 +511,56 @@
       </div>
       <div id="errorsList"></div>
     </div>
+
+    <!-- Agents view -->
+    <div class="view" id="viewAgents">
+      <div class="empty-state" id="emptyAgents">
+        <h2>No persistent agents</h2>
+        <p>Create one via CLI: <code>ldmux create</code></p>
+      </div>
+      <div id="agentsList"></div>
+    </div>
+  </div>
+
+  <!-- Edit Agent Modal -->
+  <div class="modal-overlay" id="editAgentModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="editAgentTitle">Edit agent</h2>
+        <button onclick="closeEditAgent()">Close</button>
+      </div>
+      <div class="modal-warn" id="editAgentWarn">
+        Soul/Skill changed — Claude locked the original into the existing session. Check "Reset session" to apply immediately, or reset later from the card.
+      </div>
+      <form class="modal-form" id="editAgentForm" onsubmit="event.preventDefault(); saveAgent();">
+        <label>
+          Soul (system persona)
+          <textarea id="editAgentSoul" placeholder="You are ..."></textarea>
+        </label>
+        <label>
+          Skill (expertise hints)
+          <textarea id="editAgentSkill" placeholder="Node.js, PostgreSQL, ..."></textarea>
+        </label>
+        <label>
+          Cwd (working directory for the agent's Claude process)
+          <input type="text" id="editAgentCwd" placeholder="(default: ldmux install root)">
+        </label>
+        <label>
+          Model
+          <input type="text" id="editAgentModel" placeholder="(default)">
+        </label>
+      </form>
+      <div class="modal-footer">
+        <label class="reset-checkbox">
+          <input type="checkbox" id="editAgentReset">
+          Reset session on save (required for soul/skill to take effect)
+        </label>
+        <div style="display:flex; gap:8px;">
+          <button onclick="closeEditAgent()">Cancel</button>
+          <button class="primary" onclick="saveAgent()">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Merged Output Modal -->
@@ -433,7 +578,11 @@
     let autoRefresh = null;
     let currentView = 'workers';
     let lastWorkers = [];
+    let lastAgents = [];
     let autoRefreshPaused = false;
+    let editingAgentName = null;
+    let editingOriginalSoul = '';
+    let editingOriginalSkill = '';
     const REFRESH_MS = 3000;
 
     // Start auto-refresh every 3 seconds
@@ -457,12 +606,16 @@
       });
       document.getElementById('viewWorkers').classList.toggle('active', view === 'workers');
       document.getElementById('viewErrors').classList.toggle('active', view === 'errors');
+      document.getElementById('viewAgents').classList.toggle('active', view === 'agents');
       renderCurrentView();
+      if (view === 'agents') refreshAgents();
     }
 
     function renderCurrentView() {
       if (currentView === 'errors') {
         renderErrors(lastWorkers.filter(w => w.status === 'error'));
+      } else if (currentView === 'agents') {
+        renderAgents(lastAgents);
       } else {
         renderWorkers(lastWorkers);
       }
@@ -479,12 +632,183 @@
       } catch (err) {
         console.error('Failed to refresh:', err);
       }
+      // refresh agents silently in background so the badge stays current
+      fetchAgentsOnly().catch(() => {});
+    }
+
+    async function fetchAgentsOnly() {
+      const res = await fetch('/api/agents');
+      const agents = await res.json();
+      lastAgents = agents;
+      document.getElementById('tabBadgeAgents').textContent = agents.length;
+      if (currentView === 'agents') renderAgents(agents);
+    }
+
+    async function refreshAgents() {
+      try {
+        await fetchAgentsOnly();
+      } catch (err) {
+        console.error('Failed to refresh agents:', err);
+      }
     }
 
     function updateTabBadges(workers) {
       document.getElementById('tabBadgeWorkers').textContent = workers.length;
       document.getElementById('tabBadgeErrors').textContent =
         workers.filter(w => w.status === 'error').length;
+    }
+
+    function renderAgents(agents) {
+      const list = document.getElementById('agentsList');
+      const empty = document.getElementById('emptyAgents');
+
+      if (!agents || agents.length === 0) {
+        empty.style.display = 'block';
+        while (list.firstChild) list.removeChild(list.firstChild);
+        return;
+      }
+      empty.style.display = 'none';
+
+      // Simple rewrite — agents list is small and changes rarely
+      list.innerHTML = agents.map(a => buildAgentCardHtml(a)).join('');
+    }
+
+    function buildAgentCardHtml(a) {
+      const safe = esc(a.name);
+      const soul = a.soul ? esc(a.soul) : '<span class="muted">(none)</span>';
+      const skill = a.skill ? esc(a.skill) : '<span class="muted">(none)</span>';
+      const cwd = a.cwd ? esc(a.cwd) : '<span class="muted">(default)</span>';
+      const model = a.model ? esc(a.model) : '<span class="muted">(default)</span>';
+      const cost = (a.totalCostUsd || 0).toFixed(4);
+      const statusTag = a.status ? `<span class="worker-status ${a.status}">${a.status.toUpperCase()}</span>` : '';
+      const isRunning = a.status === 'running';
+      return `
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">${safe}</span>
+            ${statusTag}
+          </div>
+          <div class="agent-meta-row">
+            <span class="agent-meta-label">Soul</span>
+            <span class="agent-meta-value">${soul}</span>
+            <span class="agent-meta-label">Skill</span>
+            <span class="agent-meta-value">${skill}</span>
+            <span class="agent-meta-label">Cwd</span>
+            <span class="agent-meta-value">${cwd}</span>
+            <span class="agent-meta-label">Model</span>
+            <span class="agent-meta-value">${model}</span>
+          </div>
+          <div class="agent-stats">
+            <span>Turns: <strong>${a.turns || 0}</strong></span>
+            <span>Cost: <strong>$${cost}</strong></span>
+            <span>Session: <strong>${a.hasSession ? 'active' : 'none'}</strong></span>
+            ${a.lastActiveAt ? `<span>Last: <strong>${new Date(a.lastActiveAt).toLocaleString()}</strong></span>` : ''}
+          </div>
+          <div class="agent-actions">
+            <button class="primary" onclick="openEditAgent('${safe}')" ${isRunning ? 'disabled title="Agent is running"' : ''}>Edit</button>
+            <button onclick="resetAgent('${safe}')" ${isRunning || !a.hasSession ? 'disabled' : ''}>Reset Session</button>
+            <button class="danger" onclick="deleteAgent('${safe}')" ${isRunning ? 'disabled' : ''}>Delete</button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function openEditAgent(name) {
+      try {
+        const res = await fetch(`/api/agents/${encodeURIComponent(name)}`);
+        if (!res.ok) { alert('Failed to load agent'); return; }
+        const cfg = await res.json();
+        editingAgentName = name;
+        editingOriginalSoul = cfg.soul || '';
+        editingOriginalSkill = cfg.skill || '';
+        document.getElementById('editAgentTitle').textContent = `Edit agent: ${name}`;
+        document.getElementById('editAgentSoul').value = cfg.soul || '';
+        document.getElementById('editAgentSkill').value = cfg.skill || '';
+        document.getElementById('editAgentCwd').value = cfg.cwd || '';
+        document.getElementById('editAgentModel').value = cfg.model || '';
+        document.getElementById('editAgentReset').checked = false;
+        document.getElementById('editAgentWarn').classList.remove('active');
+        document.getElementById('editAgentModal').classList.add('active');
+        // Wire up change detection
+        ['editAgentSoul', 'editAgentSkill'].forEach(id => {
+          const el = document.getElementById(id);
+          el.oninput = () => {
+            const changed =
+              document.getElementById('editAgentSoul').value !== editingOriginalSoul ||
+              document.getElementById('editAgentSkill').value !== editingOriginalSkill;
+            document.getElementById('editAgentWarn').classList.toggle('active', changed && cfg.hasSession);
+          };
+        });
+      } catch (err) {
+        alert('Failed to load agent: ' + err.message);
+      }
+    }
+
+    function closeEditAgent() {
+      document.getElementById('editAgentModal').classList.remove('active');
+      editingAgentName = null;
+    }
+
+    async function saveAgent() {
+      if (!editingAgentName) return;
+      const payload = {
+        soul: document.getElementById('editAgentSoul').value.trim() || null,
+        skill: document.getElementById('editAgentSkill').value.trim() || null,
+        cwd: document.getElementById('editAgentCwd').value.trim() || null,
+        model: document.getElementById('editAgentModel').value.trim() || null,
+      };
+      const reset = document.getElementById('editAgentReset').checked;
+      const url = `/api/agents/${encodeURIComponent(editingAgentName)}${reset ? '?reset=true' : ''}`;
+      try {
+        const res = await fetch(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          alert('Save failed: ' + (data.error || 'unknown error'));
+          return;
+        }
+        if (data.soulOrSkillChanged && !data.didReset) {
+          // Inform user the change won't take effect until reset
+          console.log('Soul/Skill changed but session not reset — next `ask` still uses old system prompt.');
+        }
+        closeEditAgent();
+        refreshAgents();
+      } catch (err) {
+        alert('Save failed: ' + err.message);
+      }
+    }
+
+    async function resetAgent(name) {
+      if (!confirm(`Reset session for "${name}"? This wipes history but keeps soul/skill.`)) return;
+      try {
+        const res = await fetch(`/api/agents/${encodeURIComponent(name)}/reset`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          alert('Reset failed: ' + (data.error || 'unknown error'));
+          return;
+        }
+        refreshAgents();
+      } catch (err) {
+        alert('Reset failed: ' + err.message);
+      }
+    }
+
+    async function deleteAgent(name) {
+      if (!confirm(`Delete agent "${name}" permanently? This removes soul, skill, session, history, and logs — cannot be undone.`)) return;
+      try {
+        const res = await fetch(`/api/agents/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          alert('Delete failed: ' + (data.error || 'unknown error'));
+          return;
+        }
+        refreshAgents();
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
     }
 
     function buildErrorCardHtml(w) {
