@@ -1,26 +1,26 @@
 # ldmux - Local dmux for Windows Terminal
 
-Multi-agent orchestrator cho phep chay nhieu Claude Code sessions song song tren Windows Terminal + PowerShell. Khong can cai npm global — chi can clone ve va chay.
+Multi-agent orchestrator cho phép chạy nhiều Claude Code sessions song song trên Windows Terminal + PowerShell. Không cần cài npm global — chỉ cần clone về và chạy.
 
-## Tai sao can ldmux?
+## Tại sao cần ldmux?
 
-Khi lam du an lon, ban co the chia cong viec cho nhieu AI agent chay cung luc:
-- 1 agent lam database schema
-- 1 agent lam API endpoints
-- 1 agent lam UI components
+Khi làm dự án lớn, bạn có thể chia công việc cho nhiều AI agent chạy cùng lúc:
+- 1 agent làm database schema
+- 1 agent làm API endpoints
+- 1 agent làm UI components
 
-Thay vi lam tuan tu (30 phut), chay song song chi mat ~10 phut.
+Thay vì làm tuần tự (30 phút), chạy song song chỉ mất ~10 phút.
 
-## Yeu cau he thong
+## Yêu cầu hệ thống
 
 - **OS:** Windows 10/11
-- **Terminal:** Windows Terminal (co san tren Windows 11, hoac tai tu Microsoft Store)
-- **Node.js:** >= 18.0.0 ([tai tai day](https://nodejs.org/))
-- **Claude Code CLI:** Da cai dat va dang nhap
+- **Terminal:** Windows Terminal (có sẵn trên Windows 11, hoặc tải từ Microsoft Store)
+- **Node.js:** >= 18.0.0 ([tải tại đây](https://nodejs.org/))
+- **Claude Code CLI:** Đã cài đặt và đăng nhập
 
-## Cai dat
+## Cài đặt
 
-### Cach 1: Clone tu GitHub
+### Cách 1: Clone từ GitHub
 
 ```powershell
 git clone https://github.com/GiaTrong2003/tmux-clone-for-enterprise-machine.git
@@ -28,25 +28,25 @@ cd tmux-clone-for-enterprise-machine
 npm install
 ```
 
-### Cach 2: May khong co npm (enterprise machine)
+### Cách 2: Máy không có npm (enterprise machine)
 
-Neu may khong cho cai npm global, lam theo cac buoc:
+Nếu máy không cho cài npm global, làm theo các bước:
 
-1. Tai ZIP tu GitHub: **Code > Download ZIP**
-2. Giai nen vao thu muc bat ky
-3. Copy `node_modules` tu may khac (hoac tai file `node_modules.zip` tu Releases)
-4. Giai nen `node_modules` vao thu muc du an
+1. Tải ZIP từ GitHub: **Code > Download ZIP**
+2. Giải nén vào thư mục bất kỳ
+3. Copy `node_modules` từ máy khác (hoặc tải file `node_modules.zip` từ Releases)
+4. Giải nén `node_modules` vào thư mục dự án
 
-### Cach 3: Cai lam lenh global `ldmux`
+### Cách 3: Cài làm lệnh global `ldmux`
 
-Sau khi da clone/giai nen va `npm install`, chay 1 lan duy nhat:
+Sau khi đã clone/giải nén và `npm install`, chạy 1 lần duy nhất:
 
 ```powershell
-npm run build    # Bien dich TypeScript -> dist/
-npm link         # Dang ky lenh `ldmux` toan cuc
+npm run build    # Biên dịch TypeScript -> dist/
+npm link         # Đăng ký lệnh `ldmux` toàn cục
 ```
 
-Sau do mo **bat ky terminal nao** va go truc tiep:
+Sau đó mở **bất kỳ terminal nào** và gõ trực tiếp:
 
 ```powershell
 ldmux help
@@ -55,68 +55,68 @@ ldmux run plan.json
 ldmux gui
 ```
 
-Khong can `npx ts-node src/index.ts ...` nua. Moi lan sua code TypeScript trong `src/` chi can chay lai `npm run build` — khong can `npm link` lai.
+Không cần `npx ts-node src/index.ts ...` nữa. Mỗi lần sửa code TypeScript trong `src/` chỉ cần chạy lại `npm run build` — không cần `npm link` lại.
 
-**Lenh `ldmux` chay trong thu muc hien tai (`cwd`)**, nen thu muc `.ldmux/workers/` se duoc tao ngay tai project ban dang dung. Dung project nao, chay o project do.
+**Lệnh `ldmux` chạy trong thư mục hiện tại (`cwd`)**, nên thư mục `.ldmux/workers/` sẽ được tạo ngay tại project bạn đang dùng. Đứng project nào, chạy ở project đó.
 
-**Go bo:** `npm unlink -g ldmux`
+**Gỡ bỏ:** `npm unlink -g ldmux`
 
-**Windows:** `npm link` tu dong tao `ldmux.cmd` trong thu muc npm global (da co san trong PATH).
-**Mac/Linux:** `npm link` tao symlink trong `$(npm config get prefix)/bin`. Neu go `ldmux` khong thay, kiem tra PATH co thu muc do chua.
+**Windows:** `npm link` tự động tạo `ldmux.cmd` trong thư mục npm global (đã có sẵn trong PATH).
+**Mac/Linux:** `npm link` tạo symlink trong `$(npm config get prefix)/bin`. Nếu gõ `ldmux` không thấy, kiểm tra PATH có thư mục đó chưa.
 
-## Cau truc du an
+## Cấu trúc dự án
 
 ```
 ldmux/
 ├── package.json              # Dependencies
 ├── tsconfig.json             # TypeScript config
-├── plan.example.json         # Vi du task plan
+├── plan.example.json         # Ví dụ task plan
 └── src/
     ├── index.ts              # CLI entry point
-    ├── file-comm.ts          # Doc/ghi file trong .ldmux/
-    ├── worker.ts             # Spawn va quan ly agent process
-    ├── pane-manager.ts       # Mo Windows Terminal panes qua wt CLI
-    ├── orchestrator.ts       # Doc plan.json, tao workers
-    ├── merge.ts              # Gop output tu tat ca workers
+    ├── file-comm.ts          # Đọc/ghi file trong .ldmux/
+    ├── worker.ts             # Spawn và quản lý agent process
+    ├── pane-manager.ts       # Mở Windows Terminal panes qua wt CLI
+    ├── orchestrator.ts       # Đọc plan.json, tạo workers
+    ├── merge.ts              # Gộp output từ tất cả workers
     └── gui/
         ├── server.ts         # Express API server
         └── public/
             └── index.html    # Web Dashboard
 ```
 
-## Su dung
+## Sử dụng
 
-> **Ghi chu ve cu phap:** Tat ca vi du duoi day deu dung lenh global `ldmux` (sau khi da `npm link`). Neu ban chua cai global, thay `ldmux` bang `npx ts-node src/index.ts` — ket qua giong het.
+> **Ghi chú về cú pháp:** Tất cả ví dụ dưới đây đều dùng lệnh global `ldmux` (sau khi đã `npm link`). Nếu bạn chưa cài global, thay `ldmux` bằng `npx ts-node src/index.ts` — kết quả giống hệt.
 
-### Tong quan cac lenh
+### Tổng quan các lệnh
 
-| Lenh | Muc dich |
+| Lệnh | Mục đích |
 |------|----------|
-| `ldmux new <prompt>` | Tao 1 worker don le o background |
-| `ldmux run <plan.json>` | Chay nhieu worker theo plan (mo panes + background) |
-| `ldmux list` | Liet ke tat ca worker va trang thai |
-| `ldmux merge` | Gop output tat ca worker vao `.ldmux/merged-output.md` |
-| `ldmux gui` | Mo web dashboard o http://localhost:3700 |
-| `ldmux clean` | Xoa toan bo `.ldmux/workers/` |
-| `ldmux help` | In huong dan |
+| `ldmux new <prompt>` | Tạo 1 worker đơn lẻ ở background |
+| `ldmux run <plan.json>` | Chạy nhiều worker theo plan (mở panes + background) |
+| `ldmux list` | Liệt kê tất cả worker và trạng thái |
+| `ldmux merge` | Gộp output tất cả worker vào `.ldmux/merged-output.md` |
+| `ldmux gui` | Mở web dashboard ở http://localhost:3700 |
+| `ldmux clean` | Xóa toàn bộ `.ldmux/workers/` |
+| `ldmux help` | In hướng dẫn |
 
-### 1. Tao 1 worker don le
+### 1. Tạo 1 worker đơn lẻ
 
 ```powershell
 ldmux new "Implement auth middleware for Express"
 ```
 
-Dat ten cho worker:
+Đặt tên cho worker:
 
 ```powershell
 ldmux new "Implement auth middleware" --name auth-worker
 ```
 
-Worker chay ngam o background, output ghi vao `.ldmux/workers/<name>/output.log`.
+Worker chạy ngầm ở background, output ghi vào `.ldmux/workers/<name>/output.log`.
 
-### 2. Chay tu file plan (JSON)
+### 2. Chạy từ file plan (JSON)
 
-Tao file `plan.json`:
+Tạo file `plan.json`:
 
 ```json
 {
@@ -143,24 +143,24 @@ Tao file `plan.json`:
 }
 ```
 
-Chay plan:
+Chạy plan:
 
 ```powershell
 ldmux run plan.json
 ```
 
-Chay khong mo pane (background only) — huu ich khi dang dung Linux/Mac hoac khi khong muon mo nhieu cua so:
+Chạy không mở pane (background only) — hữu ích khi đang dùng Linux/Mac hoặc khi không muốn mở nhiều cửa sổ:
 
 ```powershell
 ldmux run plan.json --no-pane
 ```
 
-**Luong thuc thi noi bo:**
-1. Neu `gitWorktree: true`, tao `git worktree` + branch rieng (`ldmux/<plan>/<worker>`) cho moi worker.
-2. Voi moi worker: mo 1 Windows Terminal pane chay `claude -p '<prompt>'` (neu bat `--pane`).
-3. **Dong thoi** spawn 1 tien trinh background cung nhiem vu — de ghi log vao `.ldmux/workers/<name>/output.log` cho `list`/`merge`/GUI doc.
+**Luồng thực thi nội bộ:**
+1. Nếu `gitWorktree: true`, tạo `git worktree` + branch riêng (`ldmux/<plan>/<worker>`) cho mỗi worker.
+2. Với mỗi worker: mở 1 Windows Terminal pane chạy `claude -p '<prompt>'` (nếu bật `--pane`).
+3. **Đồng thời** spawn 1 tiến trình background cùng nhiệm vụ — để ghi log vào `.ldmux/workers/<name>/output.log` cho `list`/`merge`/GUI đọc.
 
-### 3. Xem trang thai workers
+### 3. Xem trạng thái workers
 
 ```powershell
 ldmux list
@@ -176,73 +176,73 @@ Output:
     [!] ui - error (started: 10:30:17 AM)
 ```
 
-### 4. Mo Web Dashboard (GUI)
+### 4. Mở Web Dashboard (GUI)
 
 ```powershell
 ldmux gui
 ```
 
-Mo trinh duyet tai: **http://localhost:3700**
+Mở trình duyệt tại: **http://localhost:3700**
 
-**Web chi de xem/thao tac** — CLI va GUI doc chung `.ldmux/workers/`, nen moi thay doi o mot phia deu phan anh ben kia. Ban khong bat buoc phai mo GUI; chi can thich thi mo.
+**Web chỉ để xem/thao tác** — CLI và GUI đọc chung `.ldmux/workers/`, nên mọi thay đổi ở một phía đều phản ánh bên kia. Bạn không bắt buộc phải mở GUI; chỉ cần thích thì mở.
 
-Dashboard cho phep:
-- Xem danh sach workers real-time (tu dong refresh moi 3 giay)
-- Tao worker moi tu giao dien web
-- Xem output log cua tung worker
-- Stop worker dang chay
-- Merge ket qua tat ca workers
-- Xoa toan bo worker data
+Dashboard cho phép:
+- Xem danh sách workers real-time (tự động refresh mỗi 3 giây)
+- Tạo worker mới từ giao diện web
+- Xem output log của từng worker
+- Stop worker đang chạy
+- Merge kết quả tất cả workers
+- Xóa toàn bộ worker data
 
-**REST API** (huu ich neu muon tich hop script khac):
+**REST API** (hữu ích nếu muốn tích hợp script khác):
 
-| Method | Endpoint | Mo ta |
+| Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/api/workers` | Danh sach workers |
+| GET | `/api/workers` | Danh sách workers |
 | GET | `/api/workers/:name/status` | Status 1 worker |
 | GET | `/api/workers/:name/output` | Output log 1 worker |
-| POST | `/api/workers` | Tao worker moi (`{name, prompt, cwd?, agent?}`) |
-| POST | `/api/workers/:name/stop` | Dung 1 worker |
-| POST | `/api/merge` | Merge tat ca outputs |
-| POST | `/api/clean` | Xoa worker data |
+| POST | `/api/workers` | Tạo worker mới (`{name, prompt, cwd?, agent?}`) |
+| POST | `/api/workers/:name/stop` | Dừng 1 worker |
+| POST | `/api/merge` | Merge tất cả outputs |
+| POST | `/api/clean` | Xóa worker data |
 
-### 5. Gop ket qua (Merge)
+### 5. Gộp kết quả (Merge)
 
 ```powershell
 ldmux merge
 ```
 
-Ket qua duoc ghi vao `.ldmux/merged-output.md` — file Markdown co heading cho moi worker, kem status, timestamp va full output trong code block.
+Kết quả được ghi vào `.ldmux/merged-output.md` — file Markdown có heading cho mỗi worker, kèm status, timestamp và full output trong code block.
 
-### 6. Don dep
+### 6. Dọn dẹp
 
 ```powershell
 ldmux clean
 ```
 
-Xoa toan bo thu muc `.ldmux/workers/`. Khong xoa file `.ldmux/merged-output.md` da tao truoc do.
+Xóa toàn bộ thư mục `.ldmux/workers/`. Không xóa file `.ldmux/merged-output.md` đã tạo trước đó.
 
-## Cau hinh Plan JSON
+## Cấu hình Plan JSON
 
-| Truong | Kieu | Bat buoc | Mo ta |
+| Trường | Kiểu | Bắt buộc | Mô tả |
 |--------|------|----------|-------|
-| `name` | string | co | Ten cua plan (dung lam prefix branch khi `gitWorktree: true`) |
-| `layout` | `"vertical"` \| `"horizontal"` \| `"grid"` | khong | Cach sap xep panes — mac dinh `vertical` |
-| `gitWorktree` | boolean | khong | Tao git worktree rieng cho moi worker — mac dinh `false` |
-| `workers` | array | co | Danh sach workers (toi thieu 1) |
-| `workers[].name` | string | co | Ten worker, duy nhat, filesystem-safe (khong chua `/`, `\`, space) |
-| `workers[].prompt` | string | co | Prompt gui cho AI agent |
-| `workers[].cwd` | string | khong | Thu muc lam viec — mac dinh la thu muc goc cua plan |
-| `workers[].agent` | string | khong | `"claude"` (mac dinh), `"codex"`, hoac lenh bat ky tren PATH |
+| `name` | string | có | Tên của plan (dùng làm prefix branch khi `gitWorktree: true`) |
+| `layout` | `"vertical"` \| `"horizontal"` \| `"grid"` | không | Cách sắp xếp panes — mặc định `vertical` |
+| `gitWorktree` | boolean | không | Tạo git worktree riêng cho mỗi worker — mặc định `false` |
+| `workers` | array | có | Danh sách workers (tối thiểu 1) |
+| `workers[].name` | string | có | Tên worker, duy nhất, filesystem-safe (không chứa `/`, `\`, space) |
+| `workers[].prompt` | string | có | Prompt gửi cho AI agent |
+| `workers[].cwd` | string | không | Thư mục làm việc — mặc định là thư mục gốc của plan |
+| `workers[].agent` | string | không | `"claude"` (mặc định), `"codex"`, hoặc lệnh bất kỳ trên PATH |
 
-**Cach worker goi agent:**
+**Cách worker gọi agent:**
 - `claude` → `claude -p "<prompt>"`
 - `codex` → `codex exec --task "<prompt>"`
-- Khac → `<agent> "<prompt>"`
+- Khác → `<agent> "<prompt>"`
 
 ## Git Worktree
 
-Khi cac worker co the chinh sua cung file, bat `gitWorktree: true` de tao nhanh rieng cho moi worker:
+Khi các worker có thể chỉnh sửa cùng file, bật `gitWorktree: true` để tạo nhánh riêng cho mỗi worker:
 
 ```json
 {
@@ -255,21 +255,21 @@ Khi cac worker co the chinh sua cung file, bat `gitWorktree: true` de tao nhanh 
 }
 ```
 
-ldmux se tu dong:
-1. Tao branch `ldmux/big-feature/auth` va `ldmux/big-feature/billing`
-2. Tao worktree rieng cho moi branch
-3. Chay agent trong worktree tuong ung
+ldmux sẽ tự động:
+1. Tạo branch `ldmux/big-feature/auth` và `ldmux/big-feature/billing`
+2. Tạo worktree riêng cho mỗi branch
+3. Chạy agent trong worktree tương ứng
 
-Sau khi xong, merge bang git:
+Sau khi xong, merge bằng git:
 
 ```powershell
 git merge ldmux/big-feature/auth
 git merge ldmux/big-feature/billing
 ```
 
-## Cac mau quy trinh (Workflow Patterns)
+## Các mẫu quy trình (Workflow Patterns)
 
-### Pattern 1: Nghien cuu + Trien khai
+### Pattern 1: Nghiên cứu + Triển khai
 
 ```json
 {
@@ -306,84 +306,84 @@ git merge ldmux/big-feature/billing
 }
 ```
 
-## Cau truc thu muc `.ldmux/`
+## Cấu trúc thư mục `.ldmux/`
 
-Khi chay, ldmux tao thu muc sau trong project:
+Khi chạy, ldmux tạo thư mục sau trong project:
 
 ```
 .ldmux/
-├── merged-output.md              # Tao boi `ldmux merge`
+├── merged-output.md              # Tạo bởi `ldmux merge`
 └── workers/
     └── <worker-name>/
-        ├── task.md               # Prompt da gui cho agent
+        ├── task.md               # Prompt đã gửi cho agent
         ├── status.json           # { name, status, pid, startedAt, finishedAt, error? }
-        └── output.log            # stdout + stderr cua agent
+        └── output.log            # stdout + stderr của agent
 ```
 
-Thu muc `.ldmux/` da co trong `.gitignore` nen khong bi commit len repo.
+Thư mục `.ldmux/` đã có trong `.gitignore` nên không bị commit lên repo.
 
-**Giao thuc IPC:** CLI va GUI khong giao tiep truc tiep voi nhau — ca 2 deu doc/ghi thu muc nay. Nho vay khong can daemon, khong co state trong memory, va ban co the dong cua CLI bat cu luc nao ma worker background van chay tiep.
+**Giao thức IPC:** CLI và GUI không giao tiếp trực tiếp với nhau — cả 2 đều đọc/ghi thư mục này. Nhờ vậy không cần daemon, không có state trong memory, và bạn có thể đóng cửa CLI bất cứ lúc nào mà worker background vẫn chạy tiếp.
 
-## Luu y quan trong
+## Lưu ý quan trọng
 
-1. **Chi chay song song cac task doc lap** — khong chia task co phu thuoc lan nhau (worker A can ket qua worker B thi phai chay tuan tu).
-2. **Moi pane lam viec tren file rieng** — tranh xung dot khi 2 worker cung ghi 1 file.
-3. **Giu so pane duoi 5-6** — moi pane tieu ton API token va RAM rieng.
-4. **Kiem tra output truoc khi merge** — tranh merge code loi; dung `ldmux list` xem co worker nao `error` khong.
-5. **Dung git worktree** khi cac worker co the chinh sua cung file — moi worker co branch rieng, merge bang `git merge` sau.
-6. **Worker name phai duy nhat** — chay 2 lan cung ten se ghi de status cua lan truoc.
-7. **Khi dung CLI, tien trinh background van tiep tuc** — muon dung hay go `ldmux` qua web GUI hoac `ldmux clean` roi chay lai.
+1. **Chỉ chạy song song các task độc lập** — không chia task có phụ thuộc lẫn nhau (worker A cần kết quả worker B thì phải chạy tuần tự).
+2. **Mỗi pane làm việc trên file riêng** — tránh xung đột khi 2 worker cùng ghi 1 file.
+3. **Giữ số pane dưới 5-6** — mỗi pane tiêu tốn API token và RAM riêng.
+4. **Kiểm tra output trước khi merge** — tránh merge code lỗi; dùng `ldmux list` xem có worker nào `error` không.
+5. **Dùng git worktree** khi các worker có thể chỉnh sửa cùng file — mỗi worker có branch riêng, merge bằng `git merge` sau.
+6. **Worker name phải duy nhất** — chạy 2 lần cùng tên sẽ ghi đè status của lần trước.
+7. **Khi dừng CLI, tiến trình background vẫn tiếp tục** — muốn dừng hãy gõ `ldmux` qua web GUI hoặc `ldmux clean` rồi chạy lại.
 
-## Xu ly su co
+## Xử lý sự cố
 
-| Van de | Giai phap |
+| Vấn đề | Giải pháp |
 |--------|-----------|
-| `wt` khong tim thay | Cai Windows Terminal tu Microsoft Store |
-| `claude` khong tim thay | Cai Claude Code CLI: `npm install -g @anthropic-ai/claude-code` |
-| `ldmux` khong tim thay | Chua chay `npm link`, hoac thu muc npm global chua co trong PATH (kiem tra: `npm config get prefix`) |
-| Worker khong phan hoi | Chay `ldmux list` de kiem tra status, hoac `ldmux clean` roi chay lai |
-| Port 3700 da dung | Sua hang so `PORT` trong `src/gui/server.ts` va build lai |
-| Permission denied khi tao worktree | Kiem tra quyen git va thu muc hien tai |
-| Pane khong mo tren Mac/Linux | Dung — `wt` chi co tren Windows. Dung `ldmux run plan.json --no-pane` va xem output qua `ldmux gui` |
-| Sua code TS xong khong thay cap nhat | Quen chay `npm run build` — lenh `ldmux` toan cuc tro toi `dist/` chu khong phai `src/` |
+| `wt` không tìm thấy | Cài Windows Terminal từ Microsoft Store |
+| `claude` không tìm thấy | Cài Claude Code CLI: `npm install -g @anthropic-ai/claude-code` |
+| `ldmux` không tìm thấy | Chưa chạy `npm link`, hoặc thư mục npm global chưa có trong PATH (kiểm tra: `npm config get prefix`) |
+| Worker không phản hồi | Chạy `ldmux list` để kiểm tra status, hoặc `ldmux clean` rồi chạy lại |
+| Port 3700 đã dùng | Sửa hằng số `PORT` trong `src/gui/server.ts` và build lại |
+| Permission denied khi tạo worktree | Kiểm tra quyền git và thư mục hiện tại |
+| Pane không mở trên Mac/Linux | Đúng — `wt` chỉ có trên Windows. Dùng `ldmux run plan.json --no-pane` và xem output qua `ldmux gui` |
+| Sửa code TS xong không thấy cập nhật | Quên chạy `npm run build` — lệnh `ldmux` toàn cục trỏ tới `dist/` chứ không phải `src/` |
 
 ## Persistent Agents + MCP (Layer 2)
 
-Ngoai batch workers (one-shot), ldmux ho tro **persistent agents** — moi agent la mot conversation claude giu qua session, co the hoi-dap nhieu lan, nho context. Cac agent luu tai `~/.ldmux/workers/` — **dung chung toan may**, khong phu thuoc thu muc hien tai.
+Ngoài batch workers (one-shot), ldmux hỗ trợ **persistent agents** — mỗi agent là một conversation claude giữ qua session, có thể hỏi-đáp nhiều lần, nhớ context. Các agent lưu tại `~/.ldmux/workers/` — **dùng chung toàn máy**, không phụ thuộc thư mục hiện tại.
 
-### Tao va dung agent qua CLI
+### Tạo và dùng agent qua CLI
 
 ```bash
-# 1. Tao agent moi (interactive wizard)
+# 1. Tạo agent mới (interactive wizard)
 ldmux create
 #   - Name:  backend-expert
 #   - Soul:  "You are a pragmatic backend architect..."
 #   - Skill: "Java Spring, PostgreSQL"
 #   - Cwd, Model: optional
 
-# 2. Hoi agent
+# 2. Hỏi agent
 ldmux ask backend-expert "how does JWT validation work?"
 
 # 3. Chat REPL
 ldmux chat backend-expert
 #   You > ...
-#   /history   -> xem lich su
+#   /history   -> xem lịch sử
 #   /session   -> xem session info
-#   /exit      -> thoat
+#   /exit      -> thoát
 
-# 4. Quan ly
-ldmux agents                # liet ke tat ca agent + session stats
-ldmux edit backend-expert   # doi soul/skill/model (se hoi reset neu soul/skill doi)
-ldmux reset backend-expert  # xoa session + history, giu nguyen soul/skill
+# 4. Quản lý
+ldmux agents                # liệt kê tất cả agent + session stats
+ldmux edit backend-expert   # đổi soul/skill/model (sẽ hỏi reset nếu soul/skill đổi)
+ldmux reset backend-expert  # xóa session + history, giữ nguyên soul/skill
 ```
 
-**Luu y:** `--system-prompt` cua claude chi gan vao conversation khi tao session. Neu doi soul/skill ma muon hieu luc, phai `ldmux reset` de tao session moi.
+**Lưu ý:** `--system-prompt` của claude chỉ gắn vào conversation khi tạo session. Nếu đổi soul/skill mà muốn hiệu lực, phải `ldmux reset` để tạo session mới.
 
-### Tich hop voi Claude Code qua MCP
+### Tích hợp với Claude Code qua MCP
 
-ldmux expose MCP stdio server voi 4 tool: `list_agents`, `ask_agent`, `get_agent_history`, `create_agent`. Parent Claude Code se thay cac tool nay nhu tool thuan va tu goi khi can.
+ldmux expose MCP stdio server với 4 tool: `list_agents`, `ask_agent`, `get_agent_history`, `create_agent`. Parent Claude Code sẽ thấy các tool này như tool thuần và tự gọi khi cần.
 
-**Buoc 1** — Tao file MCP config (hoac them vao `~/.claude.json` > `mcpServers`):
+**Bước 1** — Tạo file MCP config (hoặc thêm vào `~/.claude.json` > `mcpServers`):
 
 ```json
 {
@@ -396,7 +396,7 @@ ldmux expose MCP stdio server voi 4 tool: `list_agents`, `ask_agent`, `get_agent
 }
 ```
 
-Neu chua `npm link`, dung full path:
+Nếu chưa `npm link`, dùng full path:
 
 ```json
 {
@@ -409,17 +409,17 @@ Neu chua `npm link`, dung full path:
 }
 ```
 
-**Buoc 2** — Khoi dong Claude Code voi MCP config:
+**Bước 2** — Khởi động Claude Code với MCP config:
 
 ```bash
-# Dung file config rieng
+# Dùng file config riêng
 claude --mcp-config /path/to/ldmux-mcp.json
 
-# Hoac neu da them vao ~/.claude.json thi chi can
+# Hoặc nếu đã thêm vào ~/.claude.json thì chỉ cần
 claude
 ```
 
-**Buoc 3** — Parent Claude tu dong co cac tool `mcp__ldmux__list_agents`, `mcp__ldmux__ask_agent`, ... Bat allowed tools bang setting trong `~/.claude/settings.json`:
+**Bước 3** — Parent Claude tự động có các tool `mcp__ldmux__list_agents`, `mcp__ldmux__ask_agent`, ... Bật allowed tools bằng setting trong `~/.claude/settings.json`:
 
 ```json
 {
@@ -427,25 +427,25 @@ claude
 }
 ```
 
-Hoac chay 1 lan voi flag:
+Hoặc chạy 1 lần với flag:
 
 ```bash
 claude --allowedTools "mcp__ldmux" --permission-mode dontAsk
 ```
 
-### Vi du use case
+### Ví dụ use case
 
-Ban dang lam frontend trong `/repo/fe`. Parent Claude can biet auth flow cua backend.
+Bạn đang làm frontend trong `/repo/fe`. Parent Claude cần biết auth flow của backend.
 
 ```
 User  : "How does the backend validate my JWT?"
 Parent: [calls list_agents] -> sees backend-expert with skill "Spring Boot, OAuth"
 Parent: [calls ask_agent(backend-expert, "explain JWT validation flow")]
-Agent : <answer tu backend-expert, dung cwd=/repo/be cua chinh no>
-Parent: [tong hop answer + implement tren frontend]
+Agent : <answer từ backend-expert, dùng cwd=/repo/be của chính nó>
+Parent: [tổng hợp answer + implement trên frontend]
 ```
 
-Luong nay diem khac biet so voi mo cua so claude thu 2 thu cong: parent tu quyet dinh goi, tu tong hop, conversation giua user va parent khong bi gian doan.
+Luồng này điểm khác biệt so với mở cửa sổ claude thứ 2 thủ công: parent tự quyết định gọi, tự tổng hợp, conversation giữa user và parent không bị gián đoạn.
 
 ### MCP tools reference
 
@@ -456,15 +456,15 @@ Luong nay diem khac biet so voi mo cua so claude thu 2 thu cong: parent tu quyet
 | `get_agent_history` | `name`, `limit?` | JSONL: role, content, timestamp, durationMs, costUsd |
 | `create_agent` | `name`, `soul?`, `skill?`, `cwd?`, `model?`, `overwrite?` | Created config |
 
-### Cau truc file agent
+### Cấu trúc file agent
 
 ```
 ~/.ldmux/workers/<agent-name>/
 ├── agent.json      # { name, soul, skill, cwd, model, createdAt }
 ├── session.json    # { sessionId, turns, totalCostUsd, lastActiveAt }
 ├── status.json     # sleep | running | waiting | done | error
-├── history.jsonl   # moi dong = 1 turn (user/assistant)
-└── output.log      # raw JSON output cua claude moi lan ask (debug)
+├── history.jsonl   # mỗi dòng = 1 turn (user/assistant)
+└── output.log      # raw JSON output của claude mỗi lần ask (debug)
 ```
 
 ## License
