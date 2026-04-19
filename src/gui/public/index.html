@@ -449,6 +449,71 @@
       display: none;
     }
     .modal-warn.active { display: block; }
+
+    /* Live tab */
+    .live-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .live-card.zombie { border-left: 3px solid #f85149; }
+    .live-card.stale  { border-left: 3px solid #f0883e; }
+    .live-card.ok     { border-left: 3px solid #3fb950; }
+    .live-card.unknown { border-left: 3px solid #8b949e; }
+
+    .live-header {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #21262d;
+      gap: 10px;
+    }
+    .live-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .live-name { font-weight: 600; font-size: 15px; }
+    .live-liveness {
+      font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 12px;
+      white-space: nowrap;
+    }
+    .live-liveness.ok       { background: #3fb95020; color: #3fb950; }
+    .live-liveness.zombie   { background: #f8514920; color: #f85149; }
+    .live-liveness.stale    { background: #f0883e20; color: #f0883e; }
+    .live-liveness.unknown  { background: #8b949e20; color: #8b949e; }
+
+    .live-meta {
+      padding: 8px 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 6px 16px;
+      font-size: 12px;
+      color: #8b949e;
+      border-bottom: 1px solid #21262d;
+    }
+    .live-meta strong { color: #c9d1d9; font-weight: 600; }
+
+    .live-tail {
+      background: #0d1117;
+      padding: 10px 14px;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #c9d1d9;
+    }
+    .live-tail.empty { color: #6e7681; font-style: italic; }
+
+    .live-actions {
+      padding: 8px 14px;
+      display: flex;
+      gap: 6px;
+      border-top: 1px solid #21262d;
+    }
+    .live-actions button { font-size: 12px; padding: 4px 10px; }
   </style>
 </head>
 <body>
@@ -489,6 +554,9 @@
       <button class="tab" data-view="errors" onclick="switchTab('errors')">
         Errors <span class="tab-badge error" id="tabBadgeErrors">0</span>
       </button>
+      <button class="tab" data-view="live" onclick="switchTab('live')">
+        Live <span class="tab-badge" id="tabBadgeLive">0</span>
+      </button>
       <button class="tab" data-view="agents" onclick="switchTab('agents')">
         Agents <span class="tab-badge" id="tabBadgeAgents">0</span>
       </button>
@@ -510,6 +578,15 @@
         <p>When a worker fails, detailed logs will appear here.</p>
       </div>
       <div id="errorsList"></div>
+    </div>
+
+    <!-- Live view — shows only active workers with real liveness signals -->
+    <div class="view" id="viewLive">
+      <div class="empty-state" id="emptyLive">
+        <h2>No active workers</h2>
+        <p>Workers with status <em>running / waiting / pending / sleep</em> will appear here with live PID checks and a tail of their output.</p>
+      </div>
+      <div id="liveList"></div>
     </div>
 
     <!-- Agents view -->
@@ -576,14 +653,19 @@
 
   <script>
     let autoRefresh = null;
+    let liveRefresh = null;
     let currentView = 'workers';
     let lastWorkers = [];
     let lastAgents = [];
+    let lastLive = [];
+    let liveTailOffsets = {}; // workerName -> last byte offset seen on output.log
     let autoRefreshPaused = false;
     let editingAgentName = null;
     let editingOriginalSoul = '';
     let editingOriginalSkill = '';
     const REFRESH_MS = 3000;
+    const LIVE_REFRESH_MS = 2000;
+    const ACTIVE_STATUSES = new Set(['pending', 'running', 'waiting', 'sleep']);
 
     // Start auto-refresh every 3 seconds
     function startAutoRefresh() {
@@ -606,9 +688,12 @@
       });
       document.getElementById('viewWorkers').classList.toggle('active', view === 'workers');
       document.getElementById('viewErrors').classList.toggle('active', view === 'errors');
+      document.getElementById('viewLive').classList.toggle('active', view === 'live');
       document.getElementById('viewAgents').classList.toggle('active', view === 'agents');
       renderCurrentView();
       if (view === 'agents') refreshAgents();
+      if (view === 'live') { refreshLive(); startLiveRefresh(); }
+      else { stopLiveRefresh(); }
     }
 
     function renderCurrentView() {
@@ -616,8 +701,175 @@
         renderErrors(lastWorkers.filter(w => w.status === 'error'));
       } else if (currentView === 'agents') {
         renderAgents(lastAgents);
+      } else if (currentView === 'live') {
+        renderLive(lastLive);
       } else {
         renderWorkers(lastWorkers);
+      }
+    }
+
+    function startLiveRefresh() {
+      if (liveRefresh) clearInterval(liveRefresh);
+      liveRefresh = setInterval(() => {
+        if (!autoRefreshPaused && !document.hidden && currentView === 'live') refreshLive();
+      }, LIVE_REFRESH_MS);
+    }
+    function stopLiveRefresh() {
+      if (liveRefresh) { clearInterval(liveRefresh); liveRefresh = null; }
+    }
+
+    async function refreshLive() {
+      try {
+        const res = await fetch('/api/workers/live');
+        const all = await res.json();
+        const active = all.filter(w => ACTIVE_STATUSES.has(w.status));
+        lastLive = active;
+        document.getElementById('tabBadgeLive').textContent = active.length;
+        renderLive(active);
+        // Fetch tail for each active worker in parallel (fire-and-forget)
+        active.forEach(w => refreshTail(w.name));
+        // Drop offsets for workers no longer active
+        const activeNames = new Set(active.map(w => w.name));
+        for (const n of Object.keys(liveTailOffsets)) {
+          if (!activeNames.has(n)) delete liveTailOffsets[n];
+        }
+      } catch (err) {
+        console.error('Failed to refresh live:', err);
+      }
+    }
+
+    async function refreshTail(name) {
+      const since = liveTailOffsets[name] || 0;
+      try {
+        const res = await fetch(`/api/workers/${encodeURIComponent(name)}/tail?since=${since}`);
+        const data = await res.json();
+        const el = document.getElementById(`liveTail-${name}`);
+        if (!el) return;
+        // Server may have truncated; reset if new size < our offset
+        if (data.size < since) { el.textContent = ''; liveTailOffsets[name] = 0; }
+        if (data.chunk) {
+          const wasAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+          if (el.classList.contains('empty')) { el.classList.remove('empty'); el.textContent = ''; }
+          el.appendChild(document.createTextNode(data.chunk));
+          if (wasAtBottom) el.scrollTop = el.scrollHeight;
+        } else if (!el.textContent) {
+          el.classList.add('empty');
+          el.textContent = '(no output yet)';
+        }
+        liveTailOffsets[name] = data.size;
+      } catch (err) {
+        console.error('Tail fetch failed for', name, err);
+      }
+    }
+
+    function livenessClass(w) {
+      if (w.isZombie) return 'zombie';
+      if (w.isStale) return 'stale';
+      if (w.alive === true) return 'ok';
+      return 'unknown';
+    }
+    function livenessLabel(w) {
+      if (w.isZombie) return 'ZOMBIE · PID dead';
+      if (w.isStale) return 'STALE · no recent output';
+      if (w.alive === true) return 'ALIVE';
+      if (w.alive === false) return 'PID DEAD';
+      return 'NO PID';
+    }
+
+    function fmtDuration(ms) {
+      if (ms == null) return '—';
+      const s = Math.max(0, Math.floor(ms / 1000));
+      if (s < 60) return s + 's';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ' + (s % 60) + 's';
+      const h = Math.floor(m / 60);
+      return h + 'h ' + (m % 60) + 'm';
+    }
+    function fmtRelative(ms) {
+      if (ms == null) return '—';
+      if (ms < 2000) return 'just now';
+      return fmtDuration(ms) + ' ago';
+    }
+    function fmtBytes(n) {
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+      return (n / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    function buildLiveCardHtml(w) {
+      const safe = esc(w.name);
+      const cls = livenessClass(w);
+      const label = livenessLabel(w);
+      return `
+        <div class="live-header">
+          <div class="live-header-left">
+            <span class="live-name">${safe}</span>
+            <span class="worker-status ${w.status}" data-role="status">${w.status.toUpperCase()}</span>
+          </div>
+          <span class="live-liveness ${cls}" data-role="liveness">${label}</span>
+        </div>
+        <div class="live-meta" data-role="meta">
+          <div>PID: <strong>${w.pid ?? '—'}</strong></div>
+          <div>Uptime: <strong data-role="uptime">${fmtDuration(w.uptimeMs)}</strong></div>
+          <div>Last output: <strong data-role="idle">${fmtRelative(w.idleMs)}</strong></div>
+          <div>Output: <strong data-role="bytes">${fmtBytes(w.outputBytes || 0)}</strong></div>
+        </div>
+        <div class="live-tail empty" id="liveTail-${safe}">(loading...)</div>
+        <div class="live-actions">
+          <button onclick="stopWorker('${safe}')">Stop</button>
+        </div>
+      `;
+    }
+
+    function renderLive(workers) {
+      const list = document.getElementById('liveList');
+      const empty = document.getElementById('emptyLive');
+      if (!workers || workers.length === 0) {
+        empty.style.display = 'block';
+        while (list.firstChild) list.removeChild(list.firstChild);
+        return;
+      }
+      empty.style.display = 'none';
+
+      // Remove cards for workers no longer active
+      const currentNames = new Set(workers.map(w => w.name));
+      list.querySelectorAll('.live-card').forEach(card => {
+        if (!currentNames.has(card.dataset.workerName)) card.remove();
+      });
+
+      // Upsert each worker
+      for (const w of workers) {
+        let card = list.querySelector(
+          `.live-card[data-worker-name="${CSS.escape(w.name)}"]`
+        );
+        const cls = livenessClass(w);
+        const wantedCardCls = `live-card ${cls}`;
+        if (!card) {
+          card = document.createElement('div');
+          card.className = wantedCardCls;
+          card.dataset.workerName = w.name;
+          card.innerHTML = buildLiveCardHtml(w);
+          list.appendChild(card);
+        } else {
+          if (card.className !== wantedCardCls) card.className = wantedCardCls;
+
+          const badge = card.querySelector('[data-role="status"]');
+          const wantedBadge = `worker-status ${w.status}`;
+          if (badge.className !== wantedBadge) badge.className = wantedBadge;
+          const badgeText = w.status.toUpperCase();
+          if (badge.textContent !== badgeText) badge.textContent = badgeText;
+
+          const live = card.querySelector('[data-role="liveness"]');
+          const wantedLive = `live-liveness ${cls}`;
+          if (live.className !== wantedLive) live.className = wantedLive;
+          const liveText = livenessLabel(w);
+          if (live.textContent !== liveText) live.textContent = liveText;
+
+          const meta = card.querySelector('[data-role="meta"]');
+          meta.querySelector('[data-role="uptime"]').textContent = fmtDuration(w.uptimeMs);
+          meta.querySelector('[data-role="idle"]').textContent = fmtRelative(w.idleMs);
+          meta.querySelector('[data-role="bytes"]').textContent = fmtBytes(w.outputBytes || 0);
+        }
       }
     }
 
@@ -656,6 +908,8 @@
       document.getElementById('tabBadgeWorkers').textContent = workers.length;
       document.getElementById('tabBadgeErrors').textContent =
         workers.filter(w => w.status === 'error').length;
+      document.getElementById('tabBadgeLive').textContent =
+        workers.filter(w => ACTIVE_STATUSES.has(w.status)).length;
     }
 
     function renderAgents(agents) {

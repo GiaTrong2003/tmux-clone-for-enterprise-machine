@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { listWorkers, readOutput, readStatus, readTask, clearOutput, cleanWorkers, readSession } from '../file-comm';
+import { listWorkers, listWorkersLive, readOutput, readOutputTail, readStatus, readTask, clearOutput, cleanWorkers, readSession } from '../file-comm';
 import { spawnWorker, stopWorker } from '../worker';
 import { mergeOutputs } from '../merge';
 import { listAgents, readAgentConfig, updateAgentConfig, deleteAgent } from '../agent-config';
@@ -19,10 +19,22 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
     res.json(workers);
   });
 
+  // API: List workers enriched with liveness info (PID alive check, output mtime/size)
+  app.get('/api/workers/live', (_req, res) => {
+    res.json(listWorkersLive(baseDir));
+  });
+
   // API: Get worker output
   app.get('/api/workers/:name/output', (req, res) => {
     const output = readOutput(baseDir, req.params.name);
     res.json({ name: req.params.name, output });
+  });
+
+  // API: Incremental tail — returns only bytes appended since `since`
+  app.get('/api/workers/:name/tail', (req, res) => {
+    const since = parseInt(String(req.query.since || '0'), 10) || 0;
+    const { chunk, size } = readOutputTail(baseDir, req.params.name, since);
+    res.json({ name: req.params.name, chunk, size });
   });
 
   // API: Get worker status

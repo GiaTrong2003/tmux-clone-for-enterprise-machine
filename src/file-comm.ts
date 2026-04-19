@@ -144,3 +144,80 @@ export function cleanWorkers(baseDir: string): void {
     fs.rmSync(workersDir, { recursive: true, force: true });
   }
 }
+
+// --- Liveness ---
+
+export interface WorkerLiveness {
+  alive: boolean | null;
+  lastOutputAt: string | null;
+  outputBytes: number;
+  idleMs: number | null;
+  uptimeMs: number | null;
+  isZombie: boolean;
+  isStale: boolean;
+}
+
+const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+const ACTIVE_STATUSES = new Set(['pending', 'running', 'waiting', 'sleep']);
+
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err: any) {
+    // ESRCH = no such process (dead). EPERM = exists but not ours (alive).
+    return err.code === 'EPERM';
+  }
+}
+
+export function getWorkerLiveness(baseDir: string, status: WorkerStatus): WorkerLiveness {
+  const outputPath = path.join(getWorkerDir(baseDir, status.name), 'output.log');
+  const now = Date.now();
+
+  let lastOutputAt: string | null = null;
+  let outputBytes = 0;
+  let idleMs: number | null = null;
+  if (fs.existsSync(outputPath)) {
+    const st = fs.statSync(outputPath);
+    lastOutputAt = st.mtime.toISOString();
+    outputBytes = st.size;
+    idleMs = now - st.mtimeMs;
+  }
+
+  const uptimeMs = status.startedAt ? now - new Date(status.startedAt).getTime() : null;
+
+  let alive: boolean | null = null;
+  if (status.pid) alive = isPidAlive(status.pid);
+
+  const active = ACTIVE_STATUSES.has(status.status);
+  const isZombie = active && alive === false;
+  const isStale = active && alive !== false && idleMs !== null && idleMs > STALE_THRESHOLD_MS;
+
+  return { alive, lastOutputAt, outputBytes, idleMs, uptimeMs, isZombie, isStale };
+}
+
+export function listWorkersLive(baseDir: string): (WorkerStatus & WorkerLiveness)[] {
+  return listWorkers(baseDir).map(s => ({ ...s, ...getWorkerLiveness(baseDir, s) }));
+}
+
+export function readOutputTail(
+  baseDir: string,
+  workerName: string,
+  since: number
+): { chunk: string; size: number } {
+  const outputPath = path.join(getWorkerDir(baseDir, workerName), 'output.log');
+  if (!fs.existsSync(outputPath)) return { chunk: '', size: 0 };
+  const size = fs.statSync(outputPath).size;
+  // File was truncated (e.g., retry cleared it) — send whole thing.
+  const start = since > size ? 0 : since;
+  if (start >= size) return { chunk: '', size };
+  const fd = fs.openSync(outputPath, 'r');
+  try {
+    const len = size - start;
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, start);
+    return { chunk: buf.toString('utf-8'), size };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
