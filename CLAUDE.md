@@ -10,12 +10,21 @@ Backend entry point is `src/index.ts`, invoked via `ts-node` (no prior build nee
 - `npm run dev` — shortcut for `ts-node src/index.ts gui` (starts the Express dashboard on port 3700)
 - `npm run build` — `tsc` to `./dist` and copies `src/gui/public/` (built FE) into dist.
 
-Frontend lives in a separate Vite + React + TypeScript project under `web/`:
+Frontend lives in its own sibling repo (<https://github.com/GiaTrong2003/ldmux-fe>). Check it out as `../web` relative to this BE repo — expected layout:
 
-- `npm run web:install` — install FE deps (run once after clone)
+```
+ldmux/
+  be/   ← this repo
+  web/  ← ldmux-fe
+```
+
+The FE build writes into this repo's `src/gui/public/`, which Express serves directly. BE scripts cd into `../web` to drive it:
+
+- `npm run web:install` — install FE deps in `../web` (run once after clone)
 - `npm run web:dev` — start Vite dev server on port 5173 with `/api/*` proxied to the Express backend on :3700. In dev, run `npm run dev` and `npm run web:dev` in separate terminals.
 - `npm run web:build` — Vite builds into `src/gui/public/` (wipes the dir first). Express serves that directly.
 - `npm run build:all` — FE build + backend build for release.
+- `npm run build:bundle` — FE build + single-file bundle of the backend into `release/` (via `@vercel/ncc`), zero runtime deps.
 
 CLI commands (see `src/index.ts`):
 
