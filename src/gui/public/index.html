@@ -514,6 +514,124 @@
       border-top: 1px solid #21262d;
     }
     .live-actions button { font-size: 12px; padding: 4px 10px; }
+
+    /* Company tab */
+    .company-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 14px;
+    }
+    .company-header-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .autonomy-toggle { display: inline-flex; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; }
+    .autonomy-toggle button {
+      background: transparent; color: #8b949e; border: none; padding: 6px 12px;
+      font-size: 12px; cursor: pointer;
+    }
+    .autonomy-toggle button.active { background: #1f6feb; color: #fff; }
+    .company-header .hint { font-size: 12px; color: #8b949e; }
+
+    .org-chart {
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      padding: 16px; margin-bottom: 14px; overflow-x: auto;
+    }
+    .org-chart svg { display: block; min-width: 100%; }
+    .org-node {
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .org-node:hover rect { stroke: #58a6ff; stroke-width: 2; }
+    .org-node rect {
+      fill: #0d1117; stroke: #30363d; stroke-width: 1; rx: 6;
+    }
+    .org-node.running rect { stroke: #d29922; }
+    .org-node.waiting rect { stroke: #3fb950; }
+    .org-node.error rect   { stroke: #f85149; }
+    .org-node.sleep rect   { stroke: #6e7681; }
+    .org-node text { fill: #c9d1d9; font-family: 'Segoe UI', sans-serif; }
+    .org-node .org-title { font-size: 13px; font-weight: 600; }
+    .org-node .org-role  { font-size: 11px; fill: #8b949e; }
+    .org-node .org-stats { font-size: 10px; fill: #6e7681; }
+    .org-node .org-badge { font-size: 9px; font-weight: 700; }
+    .org-node .org-badge.auto   { fill: #3fb950; }
+    .org-node .org-badge.manual { fill: #f0883e; }
+    .org-edge { stroke: #30363d; stroke-width: 1.5; fill: none; }
+
+    .conv-feed {
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      overflow: hidden;
+    }
+    .conv-feed-header {
+      padding: 10px 14px; border-bottom: 1px solid #21262d;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .conv-feed-header h3 { font-size: 14px; font-weight: 600; }
+    .conv-feed-body {
+      max-height: 320px; overflow-y: auto;
+      font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px;
+    }
+    .conv-row {
+      padding: 8px 14px; border-bottom: 1px solid #21262d;
+      cursor: pointer; display: flex; gap: 10px; align-items: flex-start;
+    }
+    .conv-row:hover { background: #1c2128; }
+    .conv-time { color: #6e7681; flex-shrink: 0; }
+    .conv-from { color: #58a6ff; font-weight: 600; }
+    .conv-arrow { color: #6e7681; }
+    .conv-to   { color: #d29922; font-weight: 600; }
+    .conv-q    { color: #c9d1d9; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conv-meta { color: #6e7681; font-size: 10px; flex-shrink: 0; }
+    .conv-feed-empty { padding: 20px; text-align: center; color: #6e7681; font-style: italic; }
+
+    .company-empty {
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      padding: 40px 20px; text-align: center;
+    }
+    .company-empty h2 { margin-bottom: 10px; }
+    .company-empty p { color: #8b949e; margin-bottom: 16px; }
+
+    .node-drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; width: 480px;
+      max-width: 90vw;
+      background: #161b22; border-left: 1px solid #30363d;
+      transform: translateX(100%); transition: transform 0.2s;
+      display: flex; flex-direction: column; z-index: 200;
+    }
+    .node-drawer.active { transform: translateX(0); }
+    .node-drawer-header {
+      padding: 14px 18px; border-bottom: 1px solid #30363d;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .node-drawer-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
+    .node-drawer-row { margin-bottom: 12px; }
+    .node-drawer-row label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .node-drawer-row .value { font-size: 13px; color: #c9d1d9; }
+    .node-drawer-ask {
+      padding: 14px 18px; border-top: 1px solid #30363d;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .node-drawer-ask textarea {
+      background: #0d1117; color: #c9d1d9; border: 1px solid #30363d;
+      border-radius: 6px; padding: 8px; min-height: 80px; resize: vertical;
+      font-family: inherit; font-size: 13px;
+    }
+    .node-drawer-ask .ask-row { display: flex; gap: 8px; align-items: center; }
+    .node-drawer-ask .ask-status { font-size: 12px; color: #8b949e; flex: 1; }
+    .node-drawer-answer {
+      background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+      padding: 10px; margin-top: 8px; font-size: 13px; line-height: 1.5;
+      max-height: 280px; overflow-y: auto; white-space: pre-wrap;
+    }
+
+    .per-agent-toggle {
+      display: inline-flex; font-size: 10px; border: 1px solid #30363d;
+      border-radius: 4px; overflow: hidden; cursor: pointer;
+    }
+    .per-agent-toggle span {
+      padding: 2px 6px; background: #0d1117; color: #8b949e;
+    }
+    .per-agent-toggle span.active.auto   { background: #3fb95020; color: #3fb950; }
+    .per-agent-toggle span.active.manual { background: #f0883e20; color: #f0883e; }
   </style>
 </head>
 <body>
@@ -560,6 +678,9 @@
       <button class="tab" data-view="agents" onclick="switchTab('agents')">
         Agents <span class="tab-badge" id="tabBadgeAgents">0</span>
       </button>
+      <button class="tab" data-view="company" onclick="switchTab('company')">
+        Company <span class="tab-badge" id="tabBadgeCompany">0</span>
+      </button>
     </div>
 
     <!-- Workers view -->
@@ -597,6 +718,117 @@
       </div>
       <div id="agentsList"></div>
     </div>
+
+    <!-- Company view — hierarchy + conversation feed -->
+    <div class="view" id="viewCompany">
+      <div class="company-header">
+        <div class="company-header-left">
+          <strong>Autonomy:</strong>
+          <div class="autonomy-toggle" id="autonomyToggle">
+            <button data-val="auto" onclick="setAutonomy('auto')">ALL auto</button>
+            <button data-val="manual" onclick="setAutonomy('manual')">ALL manual</button>
+            <button data-val="per-agent" onclick="setAutonomy(null)">Per-agent</button>
+          </div>
+          <span class="hint" id="autonomyHint">Per-agent mode — each agent uses its own setting</span>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button onclick="openCompanyInit()">+ Init company</button>
+          <button class="primary" onclick="openKickoff()">Kick off task</button>
+        </div>
+      </div>
+
+      <div id="companyEmpty" class="company-empty" style="display:none;">
+        <h2>No company yet</h2>
+        <p>Seed a starter hierarchy: CEO + BE/FE/QA managers.</p>
+        <button class="primary" onclick="openCompanyInit()">Init company</button>
+        <p style="margin-top:12px; font-size:12px;">Or from CLI: <code>ldmux company init</code></p>
+      </div>
+
+      <div class="org-chart" id="orgChartWrap" style="display:none;">
+        <svg id="orgChart" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+
+      <div class="conv-feed" id="convFeedWrap" style="display:none;">
+        <div class="conv-feed-header">
+          <h3>Conversation feed</h3>
+          <span class="hint" id="convFeedCount">0 exchanges</span>
+        </div>
+        <div class="conv-feed-body" id="convFeedBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Node drawer — per-agent detail + ask -->
+  <div class="node-drawer" id="nodeDrawer">
+    <div class="node-drawer-header">
+      <div>
+        <div style="font-weight:600; font-size:16px;" id="drawerName">—</div>
+        <div style="font-size:12px; color:#8b949e;" id="drawerRole">—</div>
+      </div>
+      <button onclick="closeDrawer()">Close</button>
+    </div>
+    <div class="node-drawer-body" id="drawerBody"></div>
+    <div class="node-drawer-ask">
+      <textarea id="drawerQuestion" placeholder="Ask this agent directly..."></textarea>
+      <div class="ask-row">
+        <span class="ask-status" id="drawerStatus"></span>
+        <button class="primary" id="drawerAskBtn" onclick="drawerAsk()">Ask</button>
+      </div>
+      <div class="node-drawer-answer" id="drawerAnswer" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Kick-off modal — ask CEO a top-level task -->
+  <div class="modal-overlay" id="kickoffModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Kick off a task</h2>
+        <button onclick="closeKickoff()">Close</button>
+      </div>
+      <form class="modal-form" onsubmit="event.preventDefault(); submitKickoff();">
+        <label>
+          Target agent
+          <select id="kickoffTarget"></select>
+        </label>
+        <label>
+          Task / question
+          <textarea id="kickoffPrompt" placeholder="Example: Our team needs to design a login page with backend API and frontend form. Plan and delegate." rows="6"></textarea>
+        </label>
+        <p style="font-size:12px; color:#8b949e;" id="kickoffHint"></p>
+      </form>
+      <div class="modal-footer">
+        <div class="ask-status" id="kickoffStatus" style="flex:1; font-size:12px; color:#8b949e;"></div>
+        <div style="display:flex; gap:8px;">
+          <button onclick="closeKickoff()">Cancel</button>
+          <button class="primary" id="kickoffSubmitBtn" onclick="submitKickoff()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Company init modal -->
+  <div class="modal-overlay" id="companyInitModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Init company</h2>
+        <button onclick="closeCompanyInit()">Close</button>
+      </div>
+      <form class="modal-form" onsubmit="event.preventDefault(); submitCompanyInit();">
+        <p style="font-size:13px; color:#8b949e;">Choose which roles to seed. Existing agents are skipped.</p>
+        <label><input type="checkbox" id="initCEO" checked disabled> CEO (always created)</label>
+        <label><input type="checkbox" id="initBE" checked> Backend Manager</label>
+        <label><input type="checkbox" id="initFE" checked> Frontend Manager</label>
+        <label><input type="checkbox" id="initQA" checked> QA Manager</label>
+        <label><input type="checkbox" id="initEngineers"> Also add BE + FE engineers (one level deeper)</label>
+      </form>
+      <div class="modal-footer">
+        <div class="ask-status" id="initStatus" style="flex:1; font-size:12px; color:#8b949e;"></div>
+        <div style="display:flex; gap:8px;">
+          <button onclick="closeCompanyInit()">Cancel</button>
+          <button class="primary" onclick="submitCompanyInit()">Create</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Edit Agent Modal -->
@@ -625,6 +857,22 @@
         <label>
           Model
           <input type="text" id="editAgentModel" placeholder="(default)">
+        </label>
+        <label>
+          Role (company title — e.g. "CEO", "Backend Manager")
+          <input type="text" id="editAgentRole" placeholder="(optional — enables hierarchy features)">
+        </label>
+        <label>
+          Reports to (name of this agent's manager, leave blank for top-level)
+          <input type="text" id="editAgentReportsTo" placeholder="e.g. ceo">
+        </label>
+        <label>
+          Autonomy
+          <select id="editAgentAutonomy">
+            <option value="">(unset — default: auto)</option>
+            <option value="auto">auto — may call ask_agent to delegate/handoff</option>
+            <option value="manual">manual — must not call ask_agent</option>
+          </select>
         </label>
       </form>
       <div class="modal-footer">
@@ -663,6 +911,9 @@
     let editingAgentName = null;
     let editingOriginalSoul = '';
     let editingOriginalSkill = '';
+    let lastCompany = { agents: [], conversations: [], autonomyOverride: null };
+    let companyRefresh = null;
+    let drawerAgent = null;
     const REFRESH_MS = 3000;
     const LIVE_REFRESH_MS = 2000;
     const ACTIVE_STATUSES = new Set(['pending', 'running', 'waiting', 'sleep']);
@@ -690,10 +941,13 @@
       document.getElementById('viewErrors').classList.toggle('active', view === 'errors');
       document.getElementById('viewLive').classList.toggle('active', view === 'live');
       document.getElementById('viewAgents').classList.toggle('active', view === 'agents');
+      document.getElementById('viewCompany').classList.toggle('active', view === 'company');
       renderCurrentView();
       if (view === 'agents') refreshAgents();
       if (view === 'live') { refreshLive(); startLiveRefresh(); }
       else { stopLiveRefresh(); }
+      if (view === 'company') { refreshCompany(); startCompanyRefresh(); }
+      else { stopCompanyRefresh(); }
     }
 
     function renderCurrentView() {
@@ -703,6 +957,8 @@
         renderAgents(lastAgents);
       } else if (currentView === 'live') {
         renderLive(lastLive);
+      } else if (currentView === 'company') {
+        renderCompany(lastCompany);
       } else {
         renderWorkers(lastWorkers);
       }
@@ -980,6 +1236,9 @@
         document.getElementById('editAgentSkill').value = cfg.skill || '';
         document.getElementById('editAgentCwd').value = cfg.cwd || '';
         document.getElementById('editAgentModel').value = cfg.model || '';
+        document.getElementById('editAgentRole').value = cfg.role || '';
+        document.getElementById('editAgentReportsTo').value = cfg.reportsTo || '';
+        document.getElementById('editAgentAutonomy').value = cfg.autonomy || '';
         document.getElementById('editAgentReset').checked = false;
         document.getElementById('editAgentWarn').classList.remove('active');
         document.getElementById('editAgentModal').classList.add('active');
@@ -1005,11 +1264,15 @@
 
     async function saveAgent() {
       if (!editingAgentName) return;
+      const autonomyVal = document.getElementById('editAgentAutonomy').value;
       const payload = {
         soul: document.getElementById('editAgentSoul').value.trim() || null,
         skill: document.getElementById('editAgentSkill').value.trim() || null,
         cwd: document.getElementById('editAgentCwd').value.trim() || null,
         model: document.getElementById('editAgentModel').value.trim() || null,
+        role: document.getElementById('editAgentRole').value.trim() || null,
+        reportsTo: document.getElementById('editAgentReportsTo').value.trim() || null,
+        autonomy: autonomyVal === '' ? null : autonomyVal,
       };
       const reset = document.getElementById('editAgentReset').checked;
       const url = `/api/agents/${encodeURIComponent(editingAgentName)}${reset ? '?reset=true' : ''}`;
@@ -1030,6 +1293,7 @@
         }
         closeEditAgent();
         refreshAgents();
+        if (currentView === 'company') refreshCompany();
       } catch (err) {
         alert('Save failed: ' + err.message);
       }
@@ -1348,6 +1612,420 @@
       const div = document.createElement('div');
       div.textContent = str;
       return div.innerHTML;
+    }
+
+    // ====== Company tab ======
+
+    function startCompanyRefresh() {
+      if (companyRefresh) clearInterval(companyRefresh);
+      companyRefresh = setInterval(() => {
+        if (!autoRefreshPaused && !document.hidden && currentView === 'company') refreshCompany();
+      }, REFRESH_MS);
+    }
+    function stopCompanyRefresh() {
+      if (companyRefresh) { clearInterval(companyRefresh); companyRefresh = null; }
+    }
+
+    async function refreshCompany() {
+      try {
+        const res = await fetch('/api/company');
+        const data = await res.json();
+        lastCompany = data;
+        document.getElementById('tabBadgeCompany').textContent = (data.agents || []).length;
+        if (currentView === 'company') renderCompany(data);
+      } catch (err) {
+        console.error('refreshCompany failed', err);
+      }
+    }
+
+    function renderCompany(data) {
+      const agents = data.agents || [];
+      const convos = data.conversations || [];
+
+      // Autonomy toggle state
+      const override = data.autonomyOverride;
+      const btns = document.querySelectorAll('#autonomyToggle button');
+      btns.forEach(b => {
+        const v = b.dataset.val;
+        const active = (override === 'auto' && v === 'auto')
+          || (override === 'manual' && v === 'manual')
+          || ((override === null || override === undefined) && v === 'per-agent');
+        b.classList.toggle('active', active);
+      });
+      const hint = document.getElementById('autonomyHint');
+      if (override === 'auto')      hint.textContent = 'All agents may auto-delegate via ask_agent.';
+      else if (override === 'manual') hint.textContent = 'No agent may call ask_agent — human routes everything.';
+      else                            hint.textContent = 'Per-agent mode — each agent uses its own setting.';
+
+      // Empty state
+      const empty = document.getElementById('companyEmpty');
+      const chartWrap = document.getElementById('orgChartWrap');
+      const feedWrap = document.getElementById('convFeedWrap');
+      if (agents.length === 0) {
+        empty.style.display = 'block';
+        chartWrap.style.display = 'none';
+        feedWrap.style.display = 'none';
+        return;
+      }
+      empty.style.display = 'none';
+      chartWrap.style.display = 'block';
+      feedWrap.style.display = 'block';
+
+      renderOrgChart(agents);
+      renderConvFeed(convos);
+      populateKickoffTargets(agents);
+    }
+
+    // Lay out agents as a top-down tree by reportsTo
+    function computeOrgLayout(agents) {
+      const byName = new Map(agents.map(a => [a.name, a]));
+      // Determine level (depth from top)
+      const level = new Map();
+      function dep(name, seen = new Set()) {
+        if (seen.has(name)) return 0; // cycle guard
+        seen.add(name);
+        const a = byName.get(name);
+        if (!a || !a.reportsTo || !byName.has(a.reportsTo)) return 0;
+        return 1 + dep(a.reportsTo, seen);
+      }
+      agents.forEach(a => level.set(a.name, dep(a.name)));
+      // Group by level
+      const rows = {};
+      agents.forEach(a => {
+        const L = level.get(a.name);
+        (rows[L] = rows[L] || []).push(a);
+      });
+      return { rows, level };
+    }
+
+    function renderOrgChart(agents) {
+      const svg = document.getElementById('orgChart');
+      // clear
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+      const { rows } = computeOrgLayout(agents);
+      const NODE_W = 180, NODE_H = 78;
+      const H_GAP = 30, V_GAP = 54;
+      const levels = Object.keys(rows).map(Number).sort((a, b) => a - b);
+      const maxCols = Math.max(...levels.map(L => rows[L].length));
+      const chartW = Math.max(600, maxCols * (NODE_W + H_GAP) + H_GAP);
+      const chartH = levels.length * (NODE_H + V_GAP) + V_GAP;
+      svg.setAttribute('viewBox', `0 0 ${chartW} ${chartH}`);
+      svg.setAttribute('height', chartH);
+
+      // Position map
+      const pos = new Map();
+      levels.forEach(L => {
+        const row = rows[L];
+        const totalW = row.length * NODE_W + (row.length - 1) * H_GAP;
+        const startX = (chartW - totalW) / 2;
+        row.forEach((a, i) => {
+          pos.set(a.name, {
+            x: startX + i * (NODE_W + H_GAP),
+            y: V_GAP / 2 + L * (NODE_H + V_GAP),
+          });
+        });
+      });
+
+      // Draw edges first (under nodes)
+      const svgNS = 'http://www.w3.org/2000/svg';
+      agents.forEach(a => {
+        if (!a.reportsTo) return;
+        const parent = pos.get(a.reportsTo);
+        const child = pos.get(a.name);
+        if (!parent || !child) return;
+        const p1 = { x: parent.x + NODE_W / 2, y: parent.y + NODE_H };
+        const p2 = { x: child.x + NODE_W / 2, y: child.y };
+        const mid = (p1.y + p2.y) / 2;
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', `M ${p1.x} ${p1.y} L ${p1.x} ${mid} L ${p2.x} ${mid} L ${p2.x} ${p2.y}`);
+        path.setAttribute('class', 'org-edge');
+        svg.appendChild(path);
+      });
+
+      // Draw nodes
+      agents.forEach(a => {
+        const p = pos.get(a.name);
+        if (!p) return;
+        const g = document.createElementNS(svgNS, 'g');
+        g.setAttribute('class', 'org-node ' + (a.status || 'sleep'));
+        g.setAttribute('transform', `translate(${p.x}, ${p.y})`);
+        g.addEventListener('click', () => openDrawer(a.name));
+
+        const rect = document.createElementNS(svgNS, 'rect');
+        rect.setAttribute('width', NODE_W);
+        rect.setAttribute('height', NODE_H);
+        g.appendChild(rect);
+
+        const title = document.createElementNS(svgNS, 'text');
+        title.setAttribute('class', 'org-title');
+        title.setAttribute('x', 10);
+        title.setAttribute('y', 18);
+        title.textContent = a.name;
+        g.appendChild(title);
+
+        const role = document.createElementNS(svgNS, 'text');
+        role.setAttribute('class', 'org-role');
+        role.setAttribute('x', 10);
+        role.setAttribute('y', 34);
+        role.textContent = a.role || '(no role)';
+        g.appendChild(role);
+
+        const stats = document.createElementNS(svgNS, 'text');
+        stats.setAttribute('class', 'org-stats');
+        stats.setAttribute('x', 10);
+        stats.setAttribute('y', 50);
+        stats.textContent = `${a.turns || 0} turns · $${(a.totalCostUsd || 0).toFixed(3)} · ${a.status || 'sleep'}`;
+        g.appendChild(stats);
+
+        const badge = document.createElementNS(svgNS, 'text');
+        badge.setAttribute('class', 'org-badge ' + (a.effectiveAutonomy || 'auto'));
+        badge.setAttribute('x', 10);
+        badge.setAttribute('y', 68);
+        badge.textContent = (a.effectiveAutonomy || 'auto').toUpperCase();
+        g.appendChild(badge);
+
+        svg.appendChild(g);
+      });
+    }
+
+    function renderConvFeed(convos) {
+      const body = document.getElementById('convFeedBody');
+      const count = document.getElementById('convFeedCount');
+      while (body.firstChild) body.removeChild(body.firstChild);
+      count.textContent = `${convos.length} exchange${convos.length === 1 ? '' : 's'}`;
+      if (convos.length === 0) {
+        const d = document.createElement('div');
+        d.className = 'conv-feed-empty';
+        d.textContent = 'No conversations yet. Kick off a task to see agents chat.';
+        body.appendChild(d);
+        return;
+      }
+      // Show newest first
+      const list = convos.slice().reverse();
+      list.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'conv-row';
+        row.onclick = () => showConvDetail(c);
+        const t = new Date(c.timestamp);
+        const hh = String(t.getHours()).padStart(2, '0');
+        const mm = String(t.getMinutes()).padStart(2, '0');
+        const ss = String(t.getSeconds()).padStart(2, '0');
+        row.innerHTML = `
+          <span class="conv-time">${hh}:${mm}:${ss}</span>
+          <span class="conv-from">${esc(c.from)}</span>
+          <span class="conv-arrow">→</span>
+          <span class="conv-to">${esc(c.to)}</span>
+          <span class="conv-q">${esc((c.question || '').slice(0, 140))}</span>
+          <span class="conv-meta">${((c.durationMs || 0) / 1000).toFixed(1)}s · $${(c.costUsd || 0).toFixed(3)}</span>
+        `;
+        body.appendChild(row);
+      });
+    }
+
+    function showConvDetail(c) {
+      const t = new Date(c.timestamp).toLocaleString();
+      alert(`${c.from} → ${c.to}   (${t})\n\nQ: ${c.question}\n\nA: ${c.answer}`);
+    }
+
+    async function setAutonomy(val) {
+      try {
+        const res = await fetch('/api/company/autonomy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ override: val }),
+        });
+        if (!res.ok) { alert('Failed to update autonomy'); return; }
+        refreshCompany();
+      } catch (err) { alert('Autonomy update failed: ' + err.message); }
+    }
+
+    // --- Node drawer ---
+
+    function openDrawer(name) {
+      const a = lastCompany.agents.find(x => x.name === name);
+      if (!a) return;
+      drawerAgent = name;
+      document.getElementById('drawerName').textContent = name;
+      document.getElementById('drawerRole').textContent = a.role || '(no role)';
+      const body = document.getElementById('drawerBody');
+      const subs = lastCompany.agents.filter(x => x.reportsTo === name).map(x => x.name);
+      body.innerHTML = `
+        <div class="node-drawer-row"><label>Status</label><div class="value">${esc(a.status || 'sleep')} · ${a.turns || 0} turns · $${(a.totalCostUsd || 0).toFixed(4)}</div></div>
+        <div class="node-drawer-row"><label>Effective autonomy</label><div class="value">${esc(a.effectiveAutonomy || 'auto')}</div></div>
+        <div class="node-drawer-row"><label>Reports to</label><div class="value">${esc(a.reportsTo || '(top-level)')}</div></div>
+        <div class="node-drawer-row"><label>Direct reports</label><div class="value">${subs.length ? subs.map(esc).join(', ') : '(none)'}</div></div>
+        <div class="node-drawer-row"><label>Soul</label><div class="value" style="white-space:pre-wrap">${esc(a.soul || '(not set)')}</div></div>
+        <div class="node-drawer-row"><label>Skill</label><div class="value">${esc(a.skill || '(not set)')}</div></div>
+        <div class="node-drawer-row">
+          <button onclick="openEditAgent('${esc(name)}')">Edit agent</button>
+          <button onclick="resetAgent('${esc(name)}')">Reset session</button>
+        </div>
+      `;
+      document.getElementById('drawerQuestion').value = '';
+      document.getElementById('drawerAnswer').style.display = 'none';
+      document.getElementById('drawerStatus').textContent = '';
+      document.getElementById('nodeDrawer').classList.add('active');
+    }
+
+    function closeDrawer() {
+      document.getElementById('nodeDrawer').classList.remove('active');
+      drawerAgent = null;
+    }
+
+    async function drawerAsk() {
+      if (!drawerAgent) return;
+      const q = document.getElementById('drawerQuestion').value.trim();
+      if (!q) { alert('Type a question first'); return; }
+      const btn = document.getElementById('drawerAskBtn');
+      const stat = document.getElementById('drawerStatus');
+      const ans = document.getElementById('drawerAnswer');
+      btn.disabled = true;
+      stat.textContent = 'Running (this may take 5–30s)...';
+      ans.style.display = 'none';
+      try {
+        const res = await fetch(`/api/agents/${encodeURIComponent(drawerAgent)}/ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: q }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          stat.textContent = 'Error: ' + (data.error || res.statusText);
+        } else {
+          stat.textContent = `done — ${(data.durationMs / 1000).toFixed(1)}s · $${(data.costUsd || 0).toFixed(4)}`;
+          ans.textContent = data.answer;
+          ans.style.display = 'block';
+          refreshCompany();
+        }
+      } catch (err) {
+        stat.textContent = 'Fetch failed: ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // --- Kick off modal ---
+
+    function populateKickoffTargets(agents) {
+      const sel = document.getElementById('kickoffTarget');
+      sel.innerHTML = '';
+      // Prefer top-level (CEO) first
+      const sorted = agents.slice().sort((a, b) => {
+        const ra = a.reportsTo ? 1 : 0;
+        const rb = b.reportsTo ? 1 : 0;
+        return ra - rb;
+      });
+      sorted.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.name;
+        opt.textContent = `${a.name}${a.role ? ' — ' + a.role : ''}`;
+        sel.appendChild(opt);
+      });
+    }
+
+    function openKickoff() {
+      if ((lastCompany.agents || []).length === 0) {
+        alert('No agents yet. Click "Init company" first.');
+        return;
+      }
+      document.getElementById('kickoffPrompt').value = '';
+      document.getElementById('kickoffStatus').textContent = '';
+      document.getElementById('kickoffModal').classList.add('active');
+    }
+    function closeKickoff() {
+      document.getElementById('kickoffModal').classList.remove('active');
+    }
+
+    async function submitKickoff() {
+      const target = document.getElementById('kickoffTarget').value;
+      const q = document.getElementById('kickoffPrompt').value.trim();
+      if (!target || !q) return;
+      const btn = document.getElementById('kickoffSubmitBtn');
+      const stat = document.getElementById('kickoffStatus');
+      btn.disabled = true;
+      stat.textContent = `Sending to ${target}... (may take a while if they delegate)`;
+      try {
+        const res = await fetch(`/api/agents/${encodeURIComponent(target)}/ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: q }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          stat.textContent = 'Error: ' + (data.error || res.statusText);
+        } else {
+          stat.textContent = `done — ${(data.durationMs / 1000).toFixed(1)}s · $${(data.costUsd || 0).toFixed(4)}`;
+          refreshCompany();
+          setTimeout(() => closeKickoff(), 1500);
+        }
+      } catch (err) {
+        stat.textContent = 'Fetch failed: ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // --- Company init modal ---
+
+    function openCompanyInit() {
+      document.getElementById('initStatus').textContent = '';
+      document.getElementById('companyInitModal').classList.add('active');
+    }
+    function closeCompanyInit() {
+      document.getElementById('companyInitModal').classList.remove('active');
+    }
+
+    async function submitCompanyInit() {
+      const wantBE = document.getElementById('initBE').checked;
+      const wantFE = document.getElementById('initFE').checked;
+      const wantQA = document.getElementById('initQA').checked;
+      const wantEng = document.getElementById('initEngineers').checked;
+      const stat = document.getElementById('initStatus');
+
+      const seed = [
+        { name: 'ceo', role: 'CEO',
+          soul: 'You are the CEO of a small AI-run software team. Think high-level: break the user\'s request into concrete workstreams, delegate to your managers, wait for their reports, and synthesize an executive summary for the user. Be decisive and concise.',
+          skill: 'Product strategy, decomposition, synthesizing cross-functional reports' },
+      ];
+      if (wantBE) seed.push({ name: 'be-manager', role: 'Backend Manager', reportsTo: 'ceo',
+        soul: 'You are the Backend Manager. Design APIs, data models, and server architecture. Coordinate with the Frontend Manager when contracts need to be defined. Always end with a concise report for your manager.',
+        skill: 'REST/GraphQL API design, databases, auth, server frameworks (Node/Go/Java)' });
+      if (wantFE) seed.push({ name: 'fe-manager', role: 'Frontend Manager', reportsTo: 'ceo',
+        soul: 'You are the Frontend Manager. Design UI flows, component structure, and client-side state. Ask the Backend Manager for API shapes when you need them. Report back succinctly.',
+        skill: 'React/Vue UI design, UX flows, client state management, accessibility' });
+      if (wantQA) seed.push({ name: 'qa-manager', role: 'QA Manager', reportsTo: 'ceo',
+        soul: 'You are the QA/QC Manager. Review plans and implementations for testability, edge cases, race conditions, and security gaps. Call out risks explicitly. Report findings to the CEO.',
+        skill: 'Test strategy, edge cases, regression risk, security review' });
+      if (wantEng && wantBE) seed.push({ name: 'be-engineer', role: 'Backend Engineer', reportsTo: 'be-manager',
+        soul: 'You are a Backend Engineer reporting to the Backend Manager. Implement the designs your manager gives you. Ask for clarification if specs are ambiguous. Report progress and blockers.',
+        skill: 'Hands-on backend coding, endpoints, migrations, unit tests' });
+      if (wantEng && wantFE) seed.push({ name: 'fe-engineer', role: 'Frontend Engineer', reportsTo: 'fe-manager',
+        soul: 'You are a Frontend Engineer reporting to the Frontend Manager. Implement UI components per spec. Flag UX concerns as you build. Report progress and blockers.',
+        skill: 'Hands-on UI coding, components, styling, frontend tests' });
+
+      let created = 0, skipped = 0;
+      for (const s of seed) {
+        stat.textContent = `Creating ${s.name}...`;
+        try {
+          const res = await fetch('/api/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...s, autonomy: 'auto' }),
+          });
+          if (res.ok) created++;
+          else {
+            const err = await res.json().catch(() => ({}));
+            if (res.status === 409) skipped++;
+            else console.warn('create failed for', s.name, err);
+          }
+        } catch (err) {
+          console.warn('create error for', s.name, err);
+        }
+      }
+      stat.textContent = `Done — ${created} created, ${skipped} already existed.`;
+      await refreshCompany();
+      setTimeout(() => closeCompanyInit(), 1200);
     }
 
     // Init

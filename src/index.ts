@@ -9,7 +9,8 @@ import { runCreateWizard, runEditWizard } from './wizard';
 import { startMcpServer } from './mcp-server';
 import { startChat } from './repl';
 import { askAgent, resetAgent } from './agent';
-import { readAgentConfig } from './agent-config';
+import { readAgentConfig, createAgent, agentExists } from './agent-config';
+import { writeStatus } from './file-comm';
 import readline from 'readline';
 
 const BASE_DIR = process.cwd();
@@ -42,6 +43,9 @@ function printHelp(): void {
     gui                   Start the web dashboard (http://localhost:3700)
     clean                 Remove all worker data
     help                  Show this help message
+
+  Company (hierarchy of agents):
+    company init          Seed CEO + BE/FE/QA managers (add --no-qa, --no-be, --no-fe, --with-engineers to tune)
 
   Examples:
     ldmux create
@@ -205,6 +209,96 @@ async function main(): Promise<void> {
     case 'clean': {
       cleanWorkers(BASE_DIR);
       console.log('  All worker data cleaned.\n');
+      break;
+    }
+
+    case 'company': {
+      const sub = args[1];
+      if (sub !== 'init') {
+        console.error('  Usage: ldmux company init [--no-qa] [--no-be] [--no-fe] [--with-engineers]');
+        process.exit(1);
+      }
+      const skip = new Set(args.filter(a => a.startsWith('--no-')).map(a => a.slice(5)));
+      const withEngineers = args.includes('--with-engineers');
+      const seed: Array<{ name: string; role: string; reportsTo?: string; soul: string; skill: string; skipKey?: string }> = [
+        {
+          name: 'ceo',
+          role: 'CEO',
+          soul: 'You are the CEO of a small AI-run software team. Think high-level: break the user\'s request into concrete workstreams, delegate to your managers, wait for their reports, and synthesize an executive summary for the user. Be decisive and concise.',
+          skill: 'Product strategy, decomposition, synthesizing cross-functional reports',
+        },
+        {
+          name: 'be-manager',
+          role: 'Backend Manager',
+          reportsTo: 'ceo',
+          soul: 'You are the Backend Manager. Design APIs, data models, and server architecture. Coordinate with the Frontend Manager when contracts need to be defined. Always end with a concise report for your manager.',
+          skill: 'REST/GraphQL API design, databases, auth, server frameworks (Node/Go/Java)',
+          skipKey: 'be',
+        },
+        {
+          name: 'fe-manager',
+          role: 'Frontend Manager',
+          reportsTo: 'ceo',
+          soul: 'You are the Frontend Manager. Design UI flows, component structure, and client-side state. Ask the Backend Manager for API shapes when you need them. Report back succinctly.',
+          skill: 'React/Vue UI design, UX flows, client state management, accessibility',
+          skipKey: 'fe',
+        },
+        {
+          name: 'qa-manager',
+          role: 'QA Manager',
+          reportsTo: 'ceo',
+          soul: 'You are the QA/QC Manager. Review plans and implementations for testability, edge cases, race conditions, and security gaps. Call out risks explicitly. Report findings to the CEO.',
+          skill: 'Test strategy, edge cases, regression risk, security review',
+          skipKey: 'qa',
+        },
+      ];
+      if (withEngineers) {
+        seed.push(
+          {
+            name: 'be-engineer',
+            role: 'Backend Engineer',
+            reportsTo: 'be-manager',
+            soul: 'You are a Backend Engineer reporting to the Backend Manager. Implement the designs your manager gives you. Ask for clarification if specs are ambiguous. Report progress and blockers.',
+            skill: 'Hands-on backend coding, writing endpoints, migrations, unit tests',
+          },
+          {
+            name: 'fe-engineer',
+            role: 'Frontend Engineer',
+            reportsTo: 'fe-manager',
+            soul: 'You are a Frontend Engineer reporting to the Frontend Manager. Implement UI components per spec. Flag UX concerns as you build. Report progress and blockers.',
+            skill: 'Hands-on UI coding, components, styling, frontend tests',
+          },
+        );
+      }
+
+      let created = 0, skipped = 0;
+      for (const s of seed) {
+        if (s.skipKey && skip.has(s.skipKey)) {
+          console.log(`  skipping ${s.name} (--no-${s.skipKey})`);
+          continue;
+        }
+        if (agentExists(AGENT_DIR, s.name)) {
+          console.log(`  ${s.name} already exists — skipping`);
+          skipped++;
+          continue;
+        }
+        const cfg = createAgent(AGENT_DIR, {
+          name: s.name,
+          soul: s.soul,
+          skill: s.skill,
+          role: s.role,
+          reportsTo: s.reportsTo,
+          autonomy: 'auto',
+        });
+        writeStatus(AGENT_DIR, s.name, {
+          name: s.name,
+          status: 'sleep',
+          startedAt: cfg.createdAt,
+        });
+        console.log(`  created ${s.name} (${s.role}${s.reportsTo ? ` → ${s.reportsTo}` : ''})`);
+        created++;
+      }
+      console.log(`\n  Done. ${created} created, ${skipped} skipped. Open 'ldmux gui' → Company tab.\n`);
       break;
     }
 

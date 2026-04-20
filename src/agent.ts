@@ -10,6 +10,7 @@ import {
   readSession,
   writeSession,
   appendHistory,
+  appendConversation,
   getOutputPath,
 } from './file-comm';
 import { AgentConfig, readAgentConfig, buildSystemPrompt } from './agent-config';
@@ -20,6 +21,10 @@ export interface AskResult {
   durationMs: number;
   costUsd: number;
   isError: boolean;
+}
+
+export interface AskOptions {
+  from?: string;  // caller agent name (for inter-agent ask) or "user"
 }
 
 export function resetAgent(baseDir: string, name: string): void {
@@ -43,11 +48,14 @@ export function resetAgent(baseDir: string, name: string): void {
 export async function askAgent(
   baseDir: string,
   name: string,
-  question: string
+  question: string,
+  opts: AskOptions = {}
 ): Promise<AskResult> {
   const cfg = readAgentConfig(baseDir, name);
   if (!cfg) throw new Error(`Agent "${name}" not found. Create it first with: ldmux create`);
 
+  const from = opts.from || 'user';
+  const startedAt = Date.now();
   const existing = readSession(baseDir, name);
   const sessionId = existing?.sessionId ?? randomUUID();
   const isFirst = !existing;
@@ -57,7 +65,7 @@ export async function askAgent(
 
   if (isFirst) {
     args.push('--session-id', sessionId);
-    const sys = buildSystemPrompt(cfg);
+    const sys = buildSystemPrompt(cfg, baseDir);
     if (sys) {
       args.push('--system-prompt', sys);
     }
@@ -73,12 +81,13 @@ export async function askAgent(
     role: 'user',
     content: question,
     timestamp: new Date().toISOString(),
+    from,
   });
 
   const workDir = cfg.cwd ? path.resolve(cfg.cwd) : baseDir;
   const cmd = cfg.agent || 'claude';
 
-  const stdout = await runProcess(cmd, args, workDir);
+  const stdout = await runProcess(cmd, args, workDir, { LDMUX_AGENT_NAME: name, LDMUX_BASE_DIR: baseDir });
 
   // Append raw output to log
   const logPath = getOutputPath(baseDir, name);
@@ -125,6 +134,17 @@ export async function askAgent(
     costUsd,
   });
 
+  // Log cross-agent conversation (flat log across the whole company)
+  appendConversation(baseDir, {
+    from,
+    to: name,
+    question,
+    answer,
+    timestamp: new Date().toISOString(),
+    durationMs: durationMs || (Date.now() - startedAt),
+    costUsd,
+  });
+
   markStatus(baseDir, name, 'waiting');
 
   return {
@@ -152,12 +172,17 @@ function markStatus(baseDir: string, name: string, status: WorkerStatus['status'
   writeStatus(baseDir, name, next);
 }
 
-function runProcess(cmd: string, args: string[], cwd: string): Promise<string> {
+function runProcess(
+  cmd: string,
+  args: string[],
+  cwd: string,
+  extraEnv: Record<string, string> = {}
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, FORCE_COLOR: '0' },
+      env: { ...process.env, FORCE_COLOR: '0', ...extraEnv },
     });
 
     let stdout = '';

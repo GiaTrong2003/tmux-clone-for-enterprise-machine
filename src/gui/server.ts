@@ -1,10 +1,14 @@
 import express from 'express';
 import path from 'path';
-import { listWorkers, listWorkersLive, readOutput, readOutputTail, readStatus, readTask, clearOutput, cleanWorkers, readSession } from '../file-comm';
+import {
+  listWorkers, listWorkersLive, readOutput, readOutputTail, readStatus, readTask, clearOutput, cleanWorkers, readSession,
+  readConversations, readConversationsTail, readCompanyConfig, writeCompanyConfig,
+} from '../file-comm';
 import { spawnWorker, stopWorker } from '../worker';
 import { mergeOutputs } from '../merge';
-import { listAgents, readAgentConfig, updateAgentConfig, deleteAgent } from '../agent-config';
-import { resetAgent } from '../agent';
+import { listAgents, readAgentConfig, updateAgentConfig, deleteAgent, resolveEffectiveAutonomy, createAgent, agentExists } from '../agent-config';
+import { resetAgent, askAgent } from '../agent';
+import { writeStatus } from '../file-comm';
 
 const PORT = 3700;
 
@@ -129,10 +133,10 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
     });
   });
 
-  // API: Update agent config (soul/skill/cwd/model). Pass null to clear a field.
-  // Query `?reset=true` resets the session after save (applies new soul/skill).
+  // API: Update agent config (soul/skill/cwd/model/role/reportsTo/autonomy). Pass null to clear a field.
+  // Query `?reset=true` resets the session after save if any prompt-affecting field changed.
   app.patch('/api/agents/:name', (req, res) => {
-    const { soul, skill, cwd, model } = req.body ?? {};
+    const { soul, skill, cwd, model, role, reportsTo, autonomy } = req.body ?? {};
     const status = readStatus(agentDir, req.params.name);
     if (status?.status === 'running') {
       res.status(409).json({ error: 'Agent is running. Wait for it to finish before editing.' });
@@ -140,7 +144,7 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
     }
     try {
       const { updated, soulOrSkillChanged } = updateAgentConfig(agentDir, req.params.name, {
-        soul, skill, cwd, model,
+        soul, skill, cwd, model, role, reportsTo, autonomy,
       });
       let didReset = false;
       if (req.query.reset === 'true' && soulOrSkillChanged) {
@@ -195,6 +199,80 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
   app.post('/api/clean', (_req, res) => {
     cleanWorkers(baseDir);
     res.json({ success: true });
+  });
+
+  // --- Company (hierarchy of agents) ---
+
+  // API: Company snapshot — agents (with hierarchy + effective autonomy), override, recent conversations
+  app.get('/api/company', (_req, res) => {
+    const company = readCompanyConfig(agentDir);
+    const agents = listAgents(agentDir).map(cfg => {
+      const session = readSession(agentDir, cfg.name);
+      const status = readStatus(agentDir, cfg.name);
+      return {
+        ...cfg,
+        status: status?.status,
+        turns: session?.turns ?? 0,
+        totalCostUsd: session?.totalCostUsd ?? 0,
+        lastActiveAt: session?.lastActiveAt,
+        effectiveAutonomy: resolveEffectiveAutonomy(agentDir, cfg),
+      };
+    });
+    res.json({
+      agents,
+      autonomyOverride: company.autonomyOverride ?? null,
+      conversations: readConversations(agentDir, 200),
+    });
+  });
+
+  // API: Conversation tail (incremental by byte offset)
+  app.get('/api/conversations', (req, res) => {
+    const since = parseInt(String(req.query.since || '0'), 10) || 0;
+    const { chunk, size } = readConversationsTail(agentDir, since);
+    res.json({ chunk, size });
+  });
+
+  // API: Set/clear global autonomy override
+  app.post('/api/company/autonomy', (req, res) => {
+    const { override } = req.body ?? {};
+    if (override !== 'auto' && override !== 'manual' && override !== null && override !== undefined) {
+      res.status(400).json({ error: 'override must be "auto", "manual", or null' });
+      return;
+    }
+    writeCompanyConfig(agentDir, { autonomyOverride: override ?? null });
+    res.json({ success: true, autonomyOverride: override ?? null });
+  });
+
+  // API: Ask any agent directly (used by kick-off + per-node ask). Blocking.
+  app.post('/api/agents/:name/ask', async (req, res) => {
+    const { question } = req.body ?? {};
+    if (!question || typeof question !== 'string') {
+      res.status(400).json({ error: 'question is required (string)' });
+      return;
+    }
+    try {
+      const r = await askAgent(agentDir, req.params.name, question, { from: 'user' });
+      res.json({ success: true, ...r });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: Create an agent (used by GUI "Init company" / quick-add)
+  app.post('/api/agents', (req, res) => {
+    const { name, soul, skill, cwd, model, role, reportsTo, autonomy, overwrite } = req.body ?? {};
+    if (!name) { res.status(400).json({ error: 'name is required' }); return; }
+    try {
+      if (!overwrite && agentExists(agentDir, name)) {
+        res.status(409).json({ error: `Agent "${name}" already exists` });
+        return;
+      }
+      const cfg = createAgent(agentDir, { name, soul, skill, cwd, model, role, reportsTo, autonomy, overwrite });
+      writeStatus(agentDir, name, { name, status: 'sleep', startedAt: cfg.createdAt });
+      res.json({ success: true, agent: cfg });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   app.listen(PORT, () => {

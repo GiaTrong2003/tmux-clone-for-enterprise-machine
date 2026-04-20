@@ -91,7 +91,7 @@ export function writeSession(baseDir: string, workerName: string, session: Agent
 export function appendHistory(
   baseDir: string,
   workerName: string,
-  entry: { role: 'user' | 'assistant'; content: string; timestamp: string; durationMs?: number; costUsd?: number }
+  entry: { role: 'user' | 'assistant'; content: string; timestamp: string; durationMs?: number; costUsd?: number; from?: string }
 ): void {
   const dir = ensureWorkerDir(baseDir, workerName);
   fs.appendFileSync(path.join(dir, 'history.jsonl'), JSON.stringify(entry) + '\n');
@@ -220,4 +220,79 @@ export function readOutputTail(
   } finally {
     fs.closeSync(fd);
   }
+}
+
+// --- Inter-agent conversations (flat log across all agents) ---
+
+export interface ConversationEntry {
+  from: string;       // caller agent name, or "user" if invoked from CLI/GUI
+  to: string;         // callee agent name
+  question: string;
+  answer: string;
+  timestamp: string;  // ISO when the exchange completed
+  durationMs: number;
+  costUsd: number;
+  isError?: boolean;
+}
+
+export function getConversationsPath(baseDir: string): string {
+  const dir = getLdmuxDir(baseDir);
+  fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'conversations.jsonl');
+}
+
+export function appendConversation(baseDir: string, entry: ConversationEntry): void {
+  fs.appendFileSync(getConversationsPath(baseDir), JSON.stringify(entry) + '\n');
+}
+
+export function readConversations(baseDir: string, limit?: number): ConversationEntry[] {
+  const p = getConversationsPath(baseDir);
+  if (!fs.existsSync(p)) return [];
+  const lines = fs.readFileSync(p, 'utf-8').trim().split('\n').filter(Boolean);
+  const parsed = lines.map(l => {
+    try { return JSON.parse(l) as ConversationEntry; } catch { return null; }
+  }).filter((e): e is ConversationEntry => e !== null);
+  return limit ? parsed.slice(-limit) : parsed;
+}
+
+export function readConversationsTail(
+  baseDir: string,
+  since: number
+): { chunk: string; size: number } {
+  const p = getConversationsPath(baseDir);
+  if (!fs.existsSync(p)) return { chunk: '', size: 0 };
+  const size = fs.statSync(p).size;
+  const start = since > size ? 0 : since;
+  if (start >= size) return { chunk: '', size };
+  const fd = fs.openSync(p, 'r');
+  try {
+    const len = size - start;
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, start);
+    return { chunk: buf.toString('utf-8'), size };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+// --- Company-level config (autonomy override) ---
+
+export interface CompanyConfig {
+  autonomyOverride?: 'auto' | 'manual' | null;
+}
+
+export function getCompanyConfigPath(baseDir: string): string {
+  return path.join(getLdmuxDir(baseDir), 'company.json');
+}
+
+export function readCompanyConfig(baseDir: string): CompanyConfig {
+  const p = getCompanyConfigPath(baseDir);
+  if (!fs.existsSync(p)) return {};
+  try { return JSON.parse(fs.readFileSync(p, 'utf-8')); } catch { return {}; }
+}
+
+export function writeCompanyConfig(baseDir: string, cfg: CompanyConfig): void {
+  const dir = getLdmuxDir(baseDir);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(getCompanyConfigPath(baseDir), JSON.stringify(cfg, null, 2));
 }

@@ -64,7 +64,8 @@ export async function startMcpServer(): Promise<void> {
     },
     async ({ name, question }) => {
       try {
-        const r = await askAgent(baseDir, name, question);
+        const from = process.env.LDMUX_AGENT_NAME || 'user';
+        const r = await askAgent(baseDir, name, question, { from });
         return {
           content: [
             {
