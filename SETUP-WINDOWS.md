@@ -21,6 +21,22 @@ Tài liệu này hướng dẫn từ con số 0 trên Windows 10/11. Dự án đ
 
   Trong Claude Code, để chạy thủ công mà vẫn thấy output trong conversation, gõ `! <lệnh>` (có dấu cách sau `!`). Ví dụ: `! claude login`.
 
+  **Lệnh long-running** (`npm run dev`, `vite`, `node release\index.js gui`) — nhắc Claude chạy ở **background** (tool có flag `run_in_background`) và đọc output bằng `Monitor`/`Read`. Nếu Claude chạy foreground, conversation sẽ treo đến khi bạn Ctrl+C, rất khó chịu. Dặn Claude đại loại: *"chạy `npm run dev` background rồi curl localhost:3700 để kiểm tra"*.
+
+- **Windows Defender quét real-time làm `npm install` chậm gấp 3–5 lần.** `node_modules` có hàng chục nghìn file nhỏ, Defender quét từng cái. Nếu máy cá nhân, thêm exclusion:
+  ```powershell
+  Add-MpPreference -ExclusionPath "D:\work\ldmux"
+  ```
+  (chạy as Administrator). Máy enterprise thì không đụng được Defender — chấp nhận chậm.
+
+- **Git line-endings.** Git trên Windows mặc định convert LF ↔ CRLF khi checkout. Với repo này hiện không có shebang script nên không vấn đề, nhưng nếu sau này build ra file shell, đặt trong repo 1 file `.gitattributes`:
+  ```
+  * text=auto eol=lf
+  *.ps1 text eol=crlf
+  *.cmd text eol=crlf
+  ```
+  Hoặc 1 lần / máy: `git config --global core.autocrlf input`.
+
 ---
 
 ## 1. Chuẩn bị máy (1 lần / máy)
