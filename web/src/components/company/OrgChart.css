@@ -1,0 +1,28 @@
+.org-chart {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  height: 500px;
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+
+.react-flow__controls {
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+.react-flow__controls button {
+  background: var(--bg-1);
+  color: var(--fg-0);
+  border-bottom: 1px solid var(--border-muted);
+}
+.react-flow__controls button:hover { background: var(--bg-hover); }
+.react-flow__controls button svg { fill: var(--fg-0); }
+
+.react-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.react-flow__attribution { display: none !important; }

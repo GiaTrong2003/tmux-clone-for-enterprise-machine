@@ -4,20 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Entry point is `src/index.ts`, invoked via `ts-node` (no prior build needed):
+Backend entry point is `src/index.ts`, invoked via `ts-node` (no prior build needed):
 
 - `npm start -- <command> [options]` or `npx ts-node src/index.ts <command> [options]`
-- `npm run dev` — shortcut for `ts-node src/index.ts gui` (starts the web dashboard on port 3700)
-- `npm run build` — `tsc` to `./dist` (per `tsconfig.json`)
+- `npm run dev` — shortcut for `ts-node src/index.ts gui` (starts the Express dashboard on port 3700)
+- `npm run build` — `tsc` to `./dist` and copies `src/gui/public/` (built FE) into dist.
+
+Frontend lives in a separate Vite + React + TypeScript project under `web/`:
+
+- `npm run web:install` — install FE deps (run once after clone)
+- `npm run web:dev` — start Vite dev server on port 5173 with `/api/*` proxied to the Express backend on :3700. In dev, run `npm run dev` and `npm run web:dev` in separate terminals.
+- `npm run web:build` — Vite builds into `src/gui/public/` (wipes the dir first). Express serves that directly.
+- `npm run build:all` — FE build + backend build for release.
 
 CLI commands (see `src/index.ts`):
 
 - `new "<prompt>" [--name <name>]` — spawn a single background worker
-- `run <plan.json> [--no-pane]` — execute a multi-worker plan; `--no-pane` skips opening Windows Terminal panes
+- `run <plan.json> [--no-pane]` — execute a multi-worker plan
 - `list` — print worker statuses from `.ldmux/workers/*/status.json`
 - `merge` — concatenate every worker's `output.log` into `.ldmux/merged-output.md`
 - `gui` — Express dashboard at http://localhost:3700
 - `clean` — remove `.ldmux/workers/`
+- `create` / `edit` / `ask` / `chat` / `agents` / `reset` — persistent agent commands
+- `mcp` — stdio MCP server (spawned by parent Claude Code)
+- `company init [--no-qa|--no-be|--no-fe] [--with-engineers]` — seed CEO + manager agents
 
 There are no automated tests or linters configured.
 
@@ -33,7 +43,9 @@ ldmux is a TypeScript CLI that spawns parallel AI-agent child processes (default
 
 **Pane manager (`src/pane-manager.ts`).** Calls `wt -w 0 sp` to split the current Windows Terminal window, running the agent piped through `Tee-Object` so output lands in the pane and in the log file. On non-Windows (`process.platform !== 'win32'`) it falls back to a no-op log, so `run` still works for testing but won't actually show panes.
 
-**GUI (`src/gui/server.ts`).** Minimal Express app serving `src/gui/public/` and REST endpoints over the same file-comm helpers: `GET /api/workers`, `GET /api/workers/:name/output|status`, `POST /api/workers` (spawn), `POST /api/workers/:name/stop`, `POST /api/merge`, `POST /api/clean`. Port 3700 is hardcoded.
+**GUI backend (`src/gui/server.ts`).** Minimal Express app on port 3700 that serves static assets from `src/gui/public/` (Vite build output) plus REST endpoints for workers, agents, and the company hierarchy. Endpoints cover: workers CRUD + tail + retry, agents CRUD + ask + reset, `/api/company` (agents with effective autonomy + conversations), `/api/conversations?since=` (incremental tail), `/api/company/autonomy` (global override), `/api/merge`, `/api/clean`.
+
+**GUI frontend (`web/`).** Standalone Vite + React 18 + TypeScript project. Uses `@xyflow/react` (React Flow v12) for the Company org-chart. Folder layout: `src/api/` typed fetch wrappers, `src/components/{workers,live,agents,company,common}/` one component tree per tab, `src/hooks/usePolling|useTail` for polling primitives, `src/types/api.ts` mirrors backend interfaces (`AgentConfig`/`WorkerStatus`/`ConversationEntry` etc. are duplicated intentionally — JSON is the contract). Design tokens in `src/styles/tokens.css`; Inter + JetBrains Mono fonts; GitHub-dark palette.
 
 **Merge (`src/merge.ts`).** Pure aggregator — reads every worker's status + `output.log` and writes a single Markdown report to `.ldmux/merged-output.md`. Does not modify worker state.
 
