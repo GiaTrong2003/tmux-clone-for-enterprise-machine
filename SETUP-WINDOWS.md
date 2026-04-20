@@ -4,6 +4,25 @@ Tài liệu này hướng dẫn từ con số 0 trên Windows 10/11. Dự án đ
 
 ---
 
+## ⚠️ Đọc trước — các ổ gà thường gặp trên Windows
+
+- **PowerShell chặn chạy script.** Lần đầu bật `npm` trong PowerShell có thể báo `npm.ps1 cannot be loaded because running scripts is disabled on this system`. Mở PowerShell **as Administrator** một lần, chạy:
+  ```powershell
+  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+  ```
+  Xong đóng, mở lại PowerShell thường.
+- **Tránh path có dấu cách và tiếng Việt.** Dùng `D:\work\ldmux\` chứ đừng dùng `D:\Tài liệu\...`. Node/npm xử lý được, nhưng vài npm script nội bộ vẫn hay vấp.
+- **Lệnh `ldmux run` mở panes chỉ chạy được bên trong Windows Terminal.** Nếu bạn mở PowerShell từ Start Menu (không phải từ tab trong Windows Terminal), `wt -w 0 sp` không split được. Luôn mở **Windows Terminal → tab PowerShell** rồi mới chạy.
+- **Claude Code CLI trên máy enterprise:** `npm install -g @anthropic-ai/claude-code` cần quyền global. Nếu IT chặn, hỏi IT đã cài sẵn chưa (chạy `where.exe claude`) — thường đã có.
+- **Nếu bạn giao guide này cho Claude Code chạy:** có mấy bước **Claude không tự làm được**, phải tự tay:
+  - `claude login` — mở browser OAuth (Claude Code không điều khiển được browser login flow).
+  - `npm link` — đôi khi đòi quyền admin tùy cấu hình npm prefix.
+  - Bất kỳ bước nào cần khởi động lại PowerShell sau khi đổi ExecutionPolicy/PATH.
+
+  Trong Claude Code, để chạy thủ công mà vẫn thấy output trong conversation, gõ `! <lệnh>` (có dấu cách sau `!`). Ví dụ: `! claude login`.
+
+---
+
 ## 1. Chuẩn bị máy (1 lần / máy)
 
 | Thành phần | Bắt buộc? | Cài thế nào |
@@ -173,8 +192,10 @@ Sau khi `npm link` (mục 7), thay `npx ts-node src/index.ts` bằng `ldmux`.
 | Lỗi | Nguyên nhân | Khắc phục |
 |---|---|---|
 | `'wt' is not recognized` | Chưa có Windows Terminal | Cài từ Microsoft Store. Hoặc chạy `ldmux run plan.json --no-pane` (chỉ background, không mở panes) |
-| `'claude' is not recognized` | Chưa cài Claude Code CLI | `npm install -g @anthropic-ai/claude-code && claude login` |
-| `EADDRINUSE :3700` | Port 3700 đang bị chiếm | Đóng tiến trình cũ (`Get-Process node \| Stop-Process`) hoặc đổi `PORT` trong `src\gui\server.ts` |
+| `'claude' is not recognized` | Chưa cài Claude Code CLI | `where.exe claude` — nếu không ra gì: máy cá nhân chạy `npm install -g @anthropic-ai/claude-code && claude login`; máy enterprise hỏi IT vì có thể chặn npm global |
+| `EADDRINUSE :3700` | Port 3700 đang bị chiếm | **Đừng** stop tất cả node — có thể dính VS Code/Claude Code. Tìm đúng PID: `netstat -ano \| findstr :3700`, rồi `Stop-Process -Id <pid>`. Hoặc đổi `PORT` trong `src\gui\server.ts` |
+| `Set-ExecutionPolicy` / `npm.ps1 cannot be loaded` | PowerShell khóa script | Xem mục "Đọc trước" ở đầu file |
+| `ldmux run` không mở pane dù đã có Windows Terminal | Đang chạy trong PowerShell Start-Menu, không phải tab trong Windows Terminal | Mở Windows Terminal → tab PowerShell → chạy lại |
 | `ENOENT ..\web` khi `npm run web:build` | Thiếu repo FE sibling | Clone `ldmux-fe` thành folder `web` như ở mục 2 |
 | Vite dev không thấy API | BE chưa chạy | Bật cửa sổ #1 trước, rồi mới `npm run dev` bên `web` |
 | Build FE ghi sai chỗ | Bạn đổi tên folder BE khác `be` | Đổi lại thành `be` hoặc sửa `outDir` trong `web\vite.config.ts` |
