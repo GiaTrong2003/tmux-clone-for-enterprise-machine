@@ -15,7 +15,7 @@ export function AgentNode({ data }: NodeProps) {
   const auto = a.effectiveAutonomy ?? 'auto';
   return (
     <div className={`agent-node ${a.status || 'sleep'}`} onClick={() => onOpen?.(a.name)}>
-      <Handle type="target" position={Position.Top} isConnectable={false} />
+      <Handle type="target" position={Position.Top} isConnectable />
       <div className="agent-node-head">
         <StatusDot status={a.status} />
         <div className="agent-node-name">{a.name}</div>
@@ -25,7 +25,7 @@ export function AgentNode({ data }: NodeProps) {
       <div className="agent-node-stats">
         {a.turns ?? 0} turns · {formatCost(a.totalCostUsd)} · {a.status || 'sleep'}
       </div>
-      <Handle type="source" position={Position.Bottom} isConnectable={false} />
+      <Handle type="source" position={Position.Bottom} isConnectable />
     </div>
   );
 }

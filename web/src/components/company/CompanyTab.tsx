@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EmptyState } from '../common/EmptyState';
 import { AutonomyHeader } from './AutonomyHeader';
 import { OrgChart } from './OrgChart';
@@ -6,6 +6,7 @@ import { ConversationFeed } from './ConversationFeed';
 import { NodeDrawer } from './NodeDrawer';
 import { KickoffModal } from './KickoffModal';
 import { InitCompanyModal } from './InitCompanyModal';
+import { AddAgentModal } from './AddAgentModal';
 import { EditAgentModal } from '../agents/EditAgentModal';
 import { getCompany, setAutonomyOverride } from '../../api/company';
 import { usePolling } from '../../hooks/usePolling';
@@ -16,6 +17,8 @@ interface Props {
   onAgentsChanged: () => void;
 }
 
+const GLOW_MS = 4000;
+
 export function CompanyTab({ paused, onAgentsChanged }: Props) {
   const { data, refresh } = usePolling(getCompany, 3000, paused);
   const company = data ?? { agents: [], conversations: [], autonomyOverride: null };
@@ -24,6 +27,55 @@ export function CompanyTab({ paused, onAgentsChanged }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [showKickoff, setShowKickoff] = useState(false);
   const [showInit, setShowInit] = useState(false);
+  const [addingUnder, setAddingUnder] = useState<string | null | undefined>(undefined);
+
+  // Active edges currently "delegating" work. Key = "parent-child", value = expiresAt ms.
+  const [activeExpiries, setActiveExpiries] = useState<Record<string, number>>({});
+  const seenConvTsRef = useRef<Set<string>>(new Set());
+  const bootstrappedRef = useRef(false);
+
+  // Detect new delegations whenever conversations update.
+  useEffect(() => {
+    const convs = company.conversations;
+    if (!bootstrappedRef.current) {
+      // On first load, treat all existing conversations as "already seen" — don't glow history.
+      convs.forEach(c => seenConvTsRef.current.add(`${c.timestamp}|${c.from}|${c.to}`));
+      bootstrappedRef.current = true;
+      return;
+    }
+    const now = Date.now();
+    const additions: Record<string, number> = {};
+    for (const c of convs) {
+      const key = `${c.timestamp}|${c.from}|${c.to}`;
+      if (seenConvTsRef.current.has(key)) continue;
+      seenConvTsRef.current.add(key);
+      if (c.from === 'user' || c.to === 'user') continue;
+      additions[`${c.from}-${c.to}`] = now + GLOW_MS;
+    }
+    if (Object.keys(additions).length > 0) {
+      setActiveExpiries(prev => ({ ...prev, ...additions }));
+    }
+  }, [company.conversations]);
+
+  // Prune expired glows.
+  useEffect(() => {
+    if (Object.keys(activeExpiries).length === 0) return;
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      setActiveExpiries(prev => {
+        let changed = false;
+        const next: Record<string, number> = {};
+        for (const [k, v] of Object.entries(prev)) {
+          if (v > now) next[k] = v;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [activeExpiries]);
+
+  const activeEdgeSet = new Set(Object.keys(activeExpiries));
 
   const handleAutonomy = useCallback(async (v: Autonomy | null) => {
     try {
@@ -59,7 +111,13 @@ export function CompanyTab({ paused, onAgentsChanged }: Props) {
         />
       ) : (
         <>
-          <OrgChart agents={company.agents} onOpenNode={setDrawerName} />
+          <OrgChart
+            agents={company.agents}
+            activeEdges={activeEdgeSet}
+            onOpenNode={setDrawerName}
+            onAddAgent={(parent) => setAddingUnder(parent)}
+            onGraphChanged={onChanged}
+          />
           <ConversationFeed conversations={company.conversations} />
         </>
       )}
@@ -83,6 +141,14 @@ export function CompanyTab({ paused, onAgentsChanged }: Props) {
       <InitCompanyModal
         open={showInit}
         onClose={() => setShowInit(false)}
+        onDone={onChanged}
+      />
+
+      <AddAgentModal
+        open={addingUnder !== undefined}
+        agents={company.agents}
+        defaultReportsTo={addingUnder ?? null}
+        onClose={() => setAddingUnder(undefined)}
         onDone={onChanged}
       />
 
