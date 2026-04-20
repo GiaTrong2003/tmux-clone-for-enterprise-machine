@@ -2,6 +2,10 @@
 
 Multi-agent orchestrator cho phép chạy nhiều Claude Code sessions song song trên Windows Terminal + PowerShell. Không cần cài npm global — chỉ cần clone về và chạy.
 
+> 👉 **Setup lần đầu trên Windows (từ A–Z):** xem [`SETUP-WINDOWS.md`](./SETUP-WINDOWS.md). Nhanh hơn nhiều so với đọc toàn bộ README này.
+>
+> Dự án đã tách thành 2 repo: BE này + [ldmux-fe](https://github.com/GiaTrong2003/ldmux-fe) (dashboard). Clone cả 2 làm sibling dưới cùng 1 thư mục cha.
+
 ## Tại sao cần ldmux?
 
 Khi làm dự án lớn, bạn có thể chia công việc cho nhiều AI agent chạy cùng lúc:
