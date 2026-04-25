@@ -16,6 +16,16 @@ export interface AgentSession {
   turns: number;
   totalCostUsd: number;
   lastActiveAt: string;
+  // Resolved cwd that was passed to the claude child process. Used to
+  // resolve the Claude Code JSONL trace path (~/.claude/projects/<encode(workDir)>/<sessionId>.jsonl).
+  workDir?: string;
+}
+
+export interface UsageInfo {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
 }
 
 const LDMUX_DIR = '.ldmux';
@@ -91,7 +101,7 @@ export function writeSession(baseDir: string, workerName: string, session: Agent
 export function appendHistory(
   baseDir: string,
   workerName: string,
-  entry: { role: 'user' | 'assistant'; content: string; timestamp: string; durationMs?: number; costUsd?: number; from?: string }
+  entry: { role: 'user' | 'assistant'; content: string; timestamp: string; durationMs?: number; costUsd?: number; from?: string; numTurns?: number; usage?: UsageInfo }
 ): void {
   const dir = ensureWorkerDir(baseDir, workerName);
   fs.appendFileSync(path.join(dir, 'history.jsonl'), JSON.stringify(entry) + '\n');
@@ -222,6 +232,23 @@ export function readOutputTail(
   }
 }
 
+export function readOutputTailLines(
+  baseDir: string,
+  workerName: string,
+  lines: number
+): { chunk: string; size: number; lines: number } {
+  const outputPath = path.join(getWorkerDir(baseDir, workerName), 'output.log');
+  if (!fs.existsSync(outputPath)) return { chunk: '', size: 0, lines: 0 };
+  const size = fs.statSync(outputPath).size;
+  const max = Math.max(1, Math.min(lines | 0, 5000));
+  const buf = fs.readFileSync(outputPath, 'utf-8');
+  const all = buf.split('\n');
+  // Last newline produces an empty trailing entry — drop only if empty.
+  if (all.length && all[all.length - 1] === '') all.pop();
+  const slice = all.slice(-max);
+  return { chunk: slice.join('\n'), size, lines: slice.length };
+}
+
 // --- Inter-agent conversations (flat log across all agents) ---
 
 export interface ConversationEntry {
@@ -233,6 +260,8 @@ export interface ConversationEntry {
   durationMs: number;
   costUsd: number;
   isError?: boolean;
+  groupId?: string;        // shared id across all messages in a group thread
+  participants?: string[]; // denormalized member list (sorted) for easy grouping
 }
 
 export function getConversationsPath(baseDir: string): string {
@@ -253,6 +282,27 @@ export function readConversations(baseDir: string, limit?: number): Conversation
     try { return JSON.parse(l) as ConversationEntry; } catch { return null; }
   }).filter((e): e is ConversationEntry => e !== null);
   return limit ? parsed.slice(-limit) : parsed;
+}
+
+export function deleteConversations(
+  baseDir: string,
+  filter: { groupId?: string; pair?: [string, string] }
+): number {
+  const p = getConversationsPath(baseDir);
+  if (!fs.existsSync(p)) return 0;
+  const all = readConversations(baseDir);
+  const pairKey = filter.pair ? [...filter.pair].sort().join('|') : null;
+  const keep: ConversationEntry[] = [];
+  let removed = 0;
+  for (const e of all) {
+    const match =
+      (filter.groupId && e.groupId === filter.groupId) ||
+      (pairKey && !e.groupId && [e.from, e.to].sort().join('|') === pairKey);
+    if (match) removed++;
+    else keep.push(e);
+  }
+  fs.writeFileSync(p, keep.map(e => JSON.stringify(e)).join('\n') + (keep.length ? '\n' : ''));
+  return removed;
 }
 
 export function readConversationsTail(

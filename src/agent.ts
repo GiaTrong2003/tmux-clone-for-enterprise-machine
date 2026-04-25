@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
@@ -25,11 +25,88 @@ export interface AskResult {
 
 export interface AskOptions {
   from?: string;  // caller agent name (for inter-agent ask) or "user"
+  groupId?: string;
+  participants?: string[];
+}
+
+// In-process registry of live claude child-processes per agent name,
+// with the metadata needed by the Debug page (cmd/argv/startedAt/pid).
+export interface LiveProcInfo {
+  agentName: string;
+  pid: number | undefined;
+  cmd: string;
+  argv: string[];
+  startedAt: string;
+  uptimeMs: number;
+  cwd: string;
+}
+
+interface TrackedProc {
+  child: ChildProcess;
+  cmd: string;
+  argv: string[];
+  startedAtMs: number;
+  startedAt: string;
+  cwd: string;
+}
+
+const liveProcs = new Map<string, Set<TrackedProc>>();
+
+function trackProc(name: string, info: TrackedProc) {
+  let set = liveProcs.get(name);
+  if (!set) { set = new Set(); liveProcs.set(name, set); }
+  set.add(info);
+  const cleanup = () => {
+    const s = liveProcs.get(name);
+    if (s) { s.delete(info); if (s.size === 0) liveProcs.delete(name); }
+  };
+  info.child.once('close', cleanup);
+  info.child.once('error', cleanup);
+}
+
+export function listLiveProcs(): LiveProcInfo[] {
+  const now = Date.now();
+  const out: LiveProcInfo[] = [];
+  for (const [agentName, set] of liveProcs.entries()) {
+    for (const p of set) {
+      out.push({
+        agentName,
+        pid: p.child.pid,
+        cmd: p.cmd,
+        argv: p.argv,
+        startedAt: p.startedAt,
+        uptimeMs: now - p.startedAtMs,
+        cwd: p.cwd,
+      });
+    }
+  }
+  return out;
+}
+
+export function killAgentProcesses(name: string): number {
+  const set = liveProcs.get(name);
+  if (!set || set.size === 0) return 0;
+  let killed = 0;
+  for (const p of set) {
+    try { p.child.kill('SIGTERM'); killed++; } catch { /* ignore */ }
+  }
+  // Hard-kill stragglers shortly after
+  setTimeout(() => {
+    const later = liveProcs.get(name);
+    if (!later) return;
+    for (const p of later) {
+      try { p.child.kill('SIGKILL'); } catch { /* ignore */ }
+    }
+  }, 500);
+  return killed;
 }
 
 export function resetAgent(baseDir: string, name: string): void {
   const cfg = readAgentConfig(baseDir, name);
   if (!cfg) throw new Error(`Agent "${name}" not found.`);
+
+  // Abort anything mid-flight for this agent before wiping state.
+  killAgentProcesses(name);
 
   const dir = path.join(baseDir, '.ldmux', 'workers', name);
   for (const f of ['session.json', 'history.jsonl', 'output.log']) {
@@ -60,6 +137,17 @@ export async function askAgent(
   const sessionId = existing?.sessionId ?? randomUUID();
   const isFirst = !existing;
 
+  // Thread propagation: if no groupId passed, this ask is the start of a
+  // new conversation thread. Generate one + a participants list. The same
+  // values get pushed into the child env so any sub-agent calls (via MCP
+  // `ask_agent`) attach replies back to *this* thread instead of spawning
+  // a new pair-thread for every hop.
+  const groupId = opts.groupId || `g-${randomUUID()}`;
+  const baseParticipants = opts.participants && opts.participants.length > 0
+    ? opts.participants
+    : [from, name];
+  const participants = Array.from(new Set(baseParticipants.concat([from, name]))).sort();
+
   // Build claude args
   const args = ['-p', question, '--output-format', 'json'];
 
@@ -87,7 +175,19 @@ export async function askAgent(
   const workDir = cfg.cwd ? path.resolve(cfg.cwd) : baseDir;
   const cmd = cfg.agent || 'claude';
 
-  const stdout = await runProcess(cmd, args, workDir, { LDMUX_AGENT_NAME: name, LDMUX_BASE_DIR: baseDir });
+  const stdout = await runProcess(
+    cmd,
+    args,
+    workDir,
+    {
+      LDMUX_AGENT_NAME: name,
+      LDMUX_BASE_DIR: baseDir,
+      LDMUX_GROUP_ID: groupId,
+      LDMUX_PARTICIPANTS: participants.join(','),
+    },
+    name,
+    true,
+  );
 
   // Append raw output to log
   const logPath = getOutputPath(baseDir, name);
@@ -115,6 +215,14 @@ export async function askAgent(
   const returnedSessionId: string = parsed.session_id ?? sessionId;
   const durationMs: number = parsed.duration_ms ?? 0;
   const costUsd: number = parsed.total_cost_usd ?? 0;
+  const numTurns: number | undefined = typeof parsed.num_turns === 'number' ? parsed.num_turns : undefined;
+  const u = parsed.usage || {};
+  const usage = {
+    inputTokens: u.input_tokens,
+    outputTokens: u.output_tokens,
+    cacheCreationInputTokens: u.cache_creation_input_tokens,
+    cacheReadInputTokens: u.cache_read_input_tokens,
+  };
 
   // Persist session
   const newSession: AgentSession = {
@@ -122,6 +230,7 @@ export async function askAgent(
     turns: (existing?.turns ?? 0) + 1,
     totalCostUsd: (existing?.totalCostUsd ?? 0) + costUsd,
     lastActiveAt: new Date().toISOString(),
+    workDir,
   };
   writeSession(baseDir, name, newSession);
 
@@ -132,6 +241,8 @@ export async function askAgent(
     timestamp: new Date().toISOString(),
     durationMs,
     costUsd,
+    numTurns,
+    usage,
   });
 
   // Log cross-agent conversation (flat log across the whole company)
@@ -143,6 +254,8 @@ export async function askAgent(
     timestamp: new Date().toISOString(),
     durationMs: durationMs || (Date.now() - startedAt),
     costUsd,
+    groupId,
+    participants,
   });
 
   markStatus(baseDir, name, 'waiting');
@@ -176,7 +289,9 @@ function runProcess(
   cmd: string,
   args: string[],
   cwd: string,
-  extraEnv: Record<string, string> = {}
+  extraEnv: Record<string, string> = {},
+  trackedAgentName?: string,
+  trackMeta = false,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
@@ -185,14 +300,31 @@ function runProcess(
       env: { ...process.env, FORCE_COLOR: '0', ...extraEnv },
     });
 
+    if (trackedAgentName) {
+      const startedAtMs = Date.now();
+      trackProc(trackedAgentName, {
+        child,
+        cmd,
+        argv: args,
+        startedAtMs,
+        startedAt: new Date(startedAtMs).toISOString(),
+        cwd,
+      });
+    }
+    void trackMeta;
+
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (b: Buffer) => { stdout += b.toString(); });
-    child.stderr.on('data', (b: Buffer) => { stderr += b.toString(); });
+    let killedByReset = false;
+    child.stdout?.on('data', (b: Buffer) => { stdout += b.toString(); });
+    child.stderr?.on('data', (b: Buffer) => { stderr += b.toString(); });
 
     child.on('error', (err) => reject(err));
-    child.on('close', (code) => {
-      if (code !== 0) {
+    child.on('close', (code, signal) => {
+      if (signal === 'SIGTERM' || signal === 'SIGKILL') killedByReset = true;
+      if (killedByReset) {
+        reject(new Error(`${cmd} was cancelled by reset.`));
+      } else if (code !== 0) {
         reject(new Error(`${cmd} exited with code ${code}. stderr: ${stderr}`));
       } else {
         resolve(stdout);

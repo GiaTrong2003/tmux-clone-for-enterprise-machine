@@ -64,3 +64,50 @@ ldmux is a TypeScript CLI that spawns parallel AI-agent child processes (default
 - Worker `name` is the primary key everywhere — directory name, status key, GUI route param. Names must be filesystem-safe.
 - Two agents are recognized by name: `claude` (default) and `codex`; anything else is invoked as `<agent> "<prompt>"`. Adding a new agent means updating both `buildAgentCommand` in `worker.ts` AND `buildPaneCommand` in `orchestrator.ts`.
 - Prompt escaping differs between contexts: `worker.ts` escapes `"` for a shell-spawn; `orchestrator.ts` escapes `'` and `"` for a PowerShell `Tee-Object` pipeline. Keep these in sync when changing prompt handling.
+
+## Features (current capabilities)
+
+### Workers (batch / one-shot)
+- Spawn a single worker (`new`) or a multi-worker plan (`run plan.json`); plans optionally create a git worktree per worker and a Windows Terminal pane.
+- Per-worker filesystem state in `.ldmux/workers/<name>/`: `task.md`, `status.json`, `output.log`. Stop/retry from CLI or GUI; `merge` produces `.ldmux/merged-output.md`.
+- Liveness inspection (`listWorkersLive` in `file-comm.ts`): `pid` alive check, output mtime/size, idle/uptime, zombie/stale flags.
+- Incremental tail by byte offset (`/api/workers/:name/tail?since=`).
+
+### Persistent agents (`create` / `edit` / `ask` / `chat` / `reset`)
+- Configurable `soul` / `skill` / `cwd` / `model` / `role` / `reportsTo` / `autonomy`; soul+skill are baked into the system prompt at session creation, so editing them prompts an opt-in reset.
+- Multi-turn sessions: turn 1 spawns `claude -p … --session-id <uuid>`, subsequent turns use `--resume <uuid>`. Cost / duration / num_turns / usage are parsed and persisted into `history.jsonl`.
+- `session.json` records `sessionId`, turn count, total cost, last-active timestamp, and the resolved `workDir` (used to locate the Claude Code JSONL trace).
+- `resetAgent` first kills any in-flight claude process for that agent before wiping `session.json` / `history.jsonl` / `output.log`.
+
+### Inter-agent conversations
+- Flat log at `.ldmux/conversations.jsonl`: `{from, to, question, answer, timestamp, durationMs, costUsd, groupId?, participants?}`.
+- Auto-threading: every new ask without an explicit `groupId` opens a fresh thread. The thread's `LDMUX_GROUP_ID` and `LDMUX_PARTICIPANTS` propagate into the child's env, so when a sub-agent calls another agent via the MCP `ask_agent` tool, the reply lands back in the same thread (no per-hop pair-thread fan-out).
+- Thread ops: add members (`POST /api/conversations/:groupId/members`, writes a `system` event), delete by `groupId` or sorted `pair`.
+
+### Company / hierarchy
+- `company init` seeds CEO + per-area managers (be / fe / qa) and optionally engineers; `role` + `reportsTo` form the org chart.
+- `effectiveAutonomy` resolves per-agent `autonomy` against the company-wide override (`.ldmux/company.json`).
+- `/api/company` returns: agents (with hierarchy + effective autonomy), `autonomyOverride`, last 200 conversations.
+
+### Live process registry & Debug surface
+- In-memory `liveProcs` map (per agent) tracks every spawned `claude` child with `{cmd, argv, pid, startedAt, cwd}`.
+- `killAgentProcesses(name)` SIGTERM all, SIGKILL stragglers after 500 ms.
+- `GET /api/debug/live-procs` snapshot for the Debug page; `POST /api/agents/:name/kill` exposes the killer apart from `reset`.
+- `GET /api/agents/:name/output/tail?lines=N` line-based tail (in addition to byte-based `?since=`).
+
+### Turn timeline (Claude Code JSONL trace, `src/trace.ts`)
+- Resolves the trace path from `session.workDir` + `sessionId` (`~/.claude/projects/<encodeCwd(workDir)>/<sessionId>.jsonl`); fallback `findTraceFile` scans all project dirs if the encoding rule mismatches.
+- Parser produces per-turn structures: `userMsg`, `assistantText`, `thinking`, `toolCalls[{name,input,result,durationMs,isError}]`, `usage{input/output/cacheRead/cacheCreation tokens}`, `model`, `durationMs`.
+- Endpoints: `GET /api/agents/:name/trace` (parsed), `GET /api/agents/:name/trace/raw` (raw JSONL).
+- Read-only — never re-invokes Claude, costs zero tokens.
+
+### MCP server (`src/mcp-server.ts`, exposed via `mcp` CLI)
+- Tools available to a parent Claude Code instance: `list_agents`, `ask_agent`, `get_agent_history`, `create_agent`.
+- `ask_agent` automatically inherits `LDMUX_GROUP_ID` / `LDMUX_PARTICIPANTS` from its env so cross-agent calls stay in the parent thread.
+
+### GUI HTTP API (port 3700, all under `/api`)
+- Workers: `GET /workers`, `GET /workers/live`, `GET /workers/:name/{output,tail,status}`, `POST /workers`, `POST /workers/:name/{stop,retry}`.
+- Agents: `GET /agents`, `GET /agents/:name`, `POST /agents`, `PATCH /agents/:name?reset=true`, `DELETE /agents/:name`, `POST /agents/:name/{ask,reset,kill}`, `GET /agents/:name/output/tail`, `GET /agents/:name/{trace,trace/raw}`.
+- Company: `GET /company`, `POST /company/autonomy`, `POST /conversations/:groupId/members`, `DELETE /conversations`, `GET /conversations?since=`.
+- Debug: `GET /debug/live-procs`.
+- Maintenance: `POST /merge`, `POST /clean`.

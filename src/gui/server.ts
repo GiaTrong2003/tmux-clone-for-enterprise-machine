@@ -1,13 +1,14 @@
 import express from 'express';
 import path from 'path';
 import {
-  listWorkers, listWorkersLive, readOutput, readOutputTail, readStatus, readTask, clearOutput, cleanWorkers, readSession,
-  readConversations, readConversationsTail, readCompanyConfig, writeCompanyConfig,
+  listWorkers, listWorkersLive, readOutput, readOutputTail, readOutputTailLines, readStatus, readTask, clearOutput, cleanWorkers, readSession,
+  readConversations, readConversationsTail, deleteConversations, appendConversation, readCompanyConfig, writeCompanyConfig,
 } from '../file-comm';
 import { spawnWorker, stopWorker } from '../worker';
 import { mergeOutputs } from '../merge';
 import { listAgents, readAgentConfig, updateAgentConfig, deleteAgent, resolveEffectiveAutonomy, createAgent, agentExists } from '../agent-config';
-import { resetAgent, askAgent } from '../agent';
+import { resetAgent, askAgent, listLiveProcs, killAgentProcesses } from '../agent';
+import { getAgentTrace, readRawTrace } from '../trace';
 import { writeStatus } from '../file-comm';
 
 const PORT = 3700;
@@ -174,13 +175,10 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
     }
   });
 
-  // API: Reset agent session (keeps soul/skill, wipes history + session)
+  // API: Reset agent session (force). Kills any in-flight claude process
+  // for this agent, then wipes session.json/history.jsonl/output.log and
+  // sets status back to 'sleep'. Keeps soul/skill config.
   app.post('/api/agents/:name/reset', (req, res) => {
-    const status = readStatus(agentDir, req.params.name);
-    if (status?.status === 'running') {
-      res.status(409).json({ error: 'Agent is running. Stop or wait before resetting.' });
-      return;
-    }
     try {
       resetAgent(agentDir, req.params.name);
       res.json({ success: true });
@@ -215,6 +213,7 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
         turns: session?.turns ?? 0,
         totalCostUsd: session?.totalCostUsd ?? 0,
         lastActiveAt: session?.lastActiveAt,
+        hasSession: !!session,
         effectiveAutonomy: resolveEffectiveAutonomy(agentDir, cfg),
       };
     });
@@ -226,6 +225,59 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
   });
 
   // API: Conversation tail (incremental by byte offset)
+  // API: Add members to a group-id thread (writes a system marker entry that extends participants)
+  app.post('/api/conversations/:groupId/members', (req, res) => {
+    const { agents } = req.body ?? {};
+    const groupId = req.params.groupId;
+    if (!groupId || !Array.isArray(agents) || agents.length === 0) {
+      res.status(400).json({ error: 'groupId + non-empty agents[] required' });
+      return;
+    }
+    const newAgents = agents.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+    if (newAgents.length === 0) {
+      res.status(400).json({ error: 'agents must contain non-empty strings' });
+      return;
+    }
+    const existing = readConversations(agentDir).filter(e => e.groupId === groupId);
+    if (existing.length === 0) {
+      res.status(404).json({ error: `No thread found with groupId ${groupId}` });
+      return;
+    }
+    const union = new Set<string>();
+    for (const e of existing) {
+      (e.participants && e.participants.length > 0 ? e.participants : [e.from, e.to]).forEach(p => union.add(p));
+    }
+    newAgents.forEach(a => union.add(a));
+    const participants = [...union].sort();
+    const joined = newAgents.join(', ');
+    appendConversation(agentDir, {
+      from: 'system',
+      to: '*',
+      question: '',
+      answer: `Added ${joined} to the thread.`,
+      timestamp: new Date().toISOString(),
+      durationMs: 0,
+      costUsd: 0,
+      groupId,
+      participants,
+    });
+    res.json({ success: true, participants });
+  });
+
+  // API: Delete a conversation thread (by groupId or sorted pair)
+  app.delete('/api/conversations', (req, res) => {
+    const { groupId, pair } = req.body ?? {};
+    if (!groupId && !(Array.isArray(pair) && pair.length === 2)) {
+      res.status(400).json({ error: 'provide groupId or pair=[string,string]' });
+      return;
+    }
+    const removed = deleteConversations(agentDir, {
+      groupId: typeof groupId === 'string' ? groupId : undefined,
+      pair: Array.isArray(pair) ? [String(pair[0]), String(pair[1])] : undefined,
+    });
+    res.json({ success: true, removed });
+  });
+
   app.get('/api/conversations', (req, res) => {
     const since = parseInt(String(req.query.since || '0'), 10) || 0;
     const { chunk, size } = readConversationsTail(agentDir, since);
@@ -245,13 +297,20 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
 
   // API: Ask any agent directly (used by kick-off + per-node ask). Blocking.
   app.post('/api/agents/:name/ask', async (req, res) => {
-    const { question } = req.body ?? {};
+    const { question, from, groupId, participants } = req.body ?? {};
     if (!question || typeof question !== 'string') {
       res.status(400).json({ error: 'question is required (string)' });
       return;
     }
+    const fromAgent = typeof from === 'string' && from.trim() ? from.trim() : 'user';
+    const gid = typeof groupId === 'string' && groupId.trim() ? groupId.trim() : undefined;
+    const parts = Array.isArray(participants) ? participants.filter((x): x is string => typeof x === 'string') : undefined;
     try {
-      const r = await askAgent(agentDir, req.params.name, question, { from: 'user' });
+      const r = await askAgent(agentDir, req.params.name, question, {
+        from: fromAgent,
+        groupId: gid,
+        participants: parts,
+      });
       res.json({ success: true, ...r });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -272,6 +331,48 @@ export function startGui(baseDir: string, agentDir: string = baseDir): void {
       res.json({ success: true, agent: cfg });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Debug page (live processes) ---
+
+  app.get('/api/debug/live-procs', (_req, res) => {
+    res.json(listLiveProcs());
+  });
+
+  app.get('/api/agents/:name/output/tail', (req, res) => {
+    const name = req.params.name;
+    if (req.query.lines !== undefined) {
+      const lines = parseInt(String(req.query.lines), 10) || 40;
+      res.json({ name, ...readOutputTailLines(agentDir, name, lines) });
+      return;
+    }
+    const since = parseInt(String(req.query.since || '0'), 10) || 0;
+    const { chunk, size } = readOutputTail(agentDir, name, since);
+    res.json({ name, chunk, size });
+  });
+
+  app.post('/api/agents/:name/kill', (req, res) => {
+    const killed = killAgentProcesses(req.params.name);
+    res.json({ success: true, killed });
+  });
+
+  // --- Turn timeline (per-turn trace from Claude Code JSONL) ---
+
+  app.get('/api/agents/:name/trace', (req, res) => {
+    try {
+      res.json(getAgentTrace(agentDir, req.params.name));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/agents/:name/trace/raw', (req, res) => {
+    try {
+      const { tracePath, raw } = readRawTrace(agentDir, req.params.name);
+      res.json({ tracePath, raw });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 

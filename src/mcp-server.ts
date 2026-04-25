@@ -65,7 +65,18 @@ export async function startMcpServer(): Promise<void> {
     async ({ name, question }) => {
       try {
         const from = process.env.LDMUX_AGENT_NAME || 'user';
-        const r = await askAgent(baseDir, name, question, { from });
+        // Inherit the parent thread so this sub-call's reply lands in the
+        // same Conversation Feed thread as the user's original ask, instead
+        // of spawning a new pair-thread for every hop.
+        const groupId = process.env.LDMUX_GROUP_ID || undefined;
+        const inherited = (process.env.LDMUX_PARTICIPANTS || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+        const participants = inherited.length > 0
+          ? Array.from(new Set([...inherited, from, name])).sort()
+          : undefined;
+        const r = await askAgent(baseDir, name, question, { from, groupId, participants });
         return {
           content: [
             {
